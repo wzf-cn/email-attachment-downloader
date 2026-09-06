@@ -55,6 +55,7 @@ public sealed class MailRule
     public bool DownloadAttachments { get; set; } = true;
     public bool SaveOriginal { get; set; } = true;
     public int MaxAttachmentMb { get; set; } = 20;
+    public bool FlatAttachments { get; set; }
     public bool ReplyEnabled { get; set; } = true;
     public string SuccessReply { get; set; } = "已收到，正文及附件已保存。";
     public bool DetectAnomaly { get; set; } = true;

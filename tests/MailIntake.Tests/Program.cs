@@ -62,6 +62,17 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("shared attachment folder keeps same names distinct and records their paths",async()=>
+        {
+            var f=new Fixture();f.Rule.FlatAttachments=true;
+            await f.Process(f.Mail("flat1",attach:true));await f.Process(f.Mail("flat2",attach:true));
+            var records=f.Store.Archives().ToList();Eq(2,records.Count);
+            var paths=records.SelectMany(r=>r.Attachments).ToList();Eq(2,paths.Distinct().Count());
+            foreach(var path in paths){Eq(Path.Combine(f.Rule.Output,"全部附件"),Path.GetDirectoryName(path));Eq("附件测试",File.ReadAllText(path));}
+            foreach(var record in records){Eq(0,Directory.GetFiles(record.Directory,"attachment_*").Length);Eq(true,File.Exists(Path.Combine(record.Directory,"附件位置.txt")));}
+            Eq(true,f.Settings.Snapshot().Accounts[0].Rules[0].FlatAttachments);
+            Eq(false,System.Text.Json.JsonSerializer.Deserialize<MailRule>("{}")!.FlatAttachments);
+        });
         await Test("attachment limit keeps exact boundary skips larger file and original EML",async()=>
         {
             var f=new Fixture();f.Rule.MaxAttachmentMb=1;var m=f.Mail("size-limit");

@@ -64,6 +64,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 effective.DownloadAttachments=same.Any(r=>r.DownloadAttachments);
                 effective.SaveOriginal=same.Any(r=>r.SaveOriginal);
                 effective.MaxAttachmentMb=same.Min(r=>r.MaxAttachmentMb);
+                effective.FlatAttachments=same.Where(r=>r.DownloadAttachments).All(r=>r.FlatAttachments);
                 var record=await ArchiveAsync(account,incoming,message,effective,recordId,token);
                 store.Archive(record);
                 if(record.SkippedAttachments.Count>0){skippedLarge=true;store.Event("附件超过上限",from,account.Address,record.Directory+"："+record.SkippedAttachments.Count+" 个附件未保存，请查看附件跳过记录.json。");log("异常：附件超过大小上限，仅记录，未保存超限文件及完整 EML。");}
@@ -154,6 +155,21 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         // Never overwrite an existing incomplete or manually edited directory.
         if(Directory.Exists(final)) final+="-重新导出-"+Guid.NewGuid().ToString("N")[..8];
         files=files.Select(f=>Path.Combine(final,Path.GetFileName(f))).ToList();
+        if(rule.FlatAttachments&&files.Count>0)
+        {
+            string shared=Path.Combine(parent,"全部附件");Directory.CreateDirectory(shared);
+            var sharedFiles=new List<string>();
+            string title=SafeName(incoming.Subject);title=title[..Math.Min(title.Length,40)];
+            foreach(string file in files)
+            {
+                string name=Path.GetFileName(file);
+                string destination=Path.Combine(shared,title+"_"+incoming.Id[..8]+"_"+Guid.NewGuid().ToString("N")[..8]+"_"+name);
+                File.Move(Path.Combine(staging,name),destination);
+                sharedFiles.Add(destination);
+            }
+            files=sharedFiles;
+            await File.WriteAllLinesAsync(Path.Combine(staging,"附件位置.txt"),new[]{"本邮件附件集中存放在："}.Concat(files),token);
+        }
         var record=new ArchiveRecord(recordId,account.Address,incoming.Sender,incoming.Subject,rule.Name,final,incoming.ReceivedAt,message.Date,DateTimeOffset.UtcNow,message.MessageId??"",files){SkippedAttachments=skipped};
         await File.WriteAllTextAsync(Path.Combine(staging,"metadata.json"),JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true}),token);
         Directory.Move(staging,final); return record;
