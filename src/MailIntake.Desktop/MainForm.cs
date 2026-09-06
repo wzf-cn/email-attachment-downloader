@@ -31,9 +31,8 @@ internal sealed class MainForm : Form
         this.smoke=smoke; settings=LocalSettings.Load();activeSettings=settings.Snapshot();store=new(LocalSettings.Database);
         Text="邮件接收管理 · MailKit";Size=new Size(1150,850);MinimumSize=new Size(960,700);
         StartPosition=FormStartPosition.CenterScreen;Font=new Font("Microsoft YaHei UI",10);BackColor=Color.FromArgb(245,247,250);
-        var header=new Panel{Dock=DockStyle.Top,Height=85,Padding=new Padding(20,12,20,8),BackColor=Color.FromArgb(25,48,75)};
-        header.Controls.Add(new Label{Text="邮件接收管理",Dock=DockStyle.Top,Height=35,Font=new Font(Font.FontFamily,19,FontStyle.Bold),ForeColor=Color.White});
-        header.Controls.Add(new Label{Text="多邮箱  /  规则归档  /  主题校验  /  异常停收",Dock=DockStyle.Bottom,Height=25,ForeColor=Color.FromArgb(189,212,232)});
+        var header=new Panel{Dock=DockStyle.Top,Height=54,Padding=new Padding(18,0,18,0),BackColor=Color.FromArgb(245,247,250)};
+        header.Controls.Add(new Label{Text="邮件接收管理",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Font=new Font(Font.FontFamily,14,FontStyle.Bold),ForeColor=Color.FromArgb(38,50,64)});
         var tabs=new TabControl{Dock=DockStyle.Fill,Padding=new Point(20,9)};
         var setup=new TabPage("邮箱与规则"){Padding=new Padding(12)};
         var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=220};
