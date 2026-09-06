@@ -150,3 +150,6 @@ dotnet run --project tests/MailIntake.Tests/MailIntake.Tests.csproj
 规则编辑分为“触发与主题”“下载与存放”“回复与安全”“测试识别”。主题示例随设置更新；切换页面保留未保存的填写内容。邮箱登录和收发服务器分开设置。数据目录和现有规则格式不变。
 
 开发验证使用独立临时目录和模拟邮件；`--smoke-test` 配合 `MAILINTAKE_CAPTURE` 可导出各页面及最小窗口截图，不接入真实邮箱。
+
+### 1.2.0 私密反馈
+意见反馈改为 HTTPS 直接提交到自建后台，无需邮箱或 Gitee 账号。支持可选联系方式、本地草稿、失败重试去重。后台部署、备份和迁移见 [部署说明](docs/FEEDBACK_DEPLOYMENT.md)。

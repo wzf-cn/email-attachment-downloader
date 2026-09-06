@@ -1,0 +1,23 @@
+[Unit]
+Description=Mail Intake Feedback
+After=network.target
+
+[Service]
+User=mail-feedback
+Group=mail-feedback
+WorkingDirectory=/opt/mail-intake-feedback
+ExecStart=/usr/bin/python3 /opt/mail-intake-feedback/server.py
+Environment=FEEDBACK_DATA=/var/lib/mail-intake-feedback
+StateDirectory=mail-intake-feedback
+UMask=0077
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=192M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

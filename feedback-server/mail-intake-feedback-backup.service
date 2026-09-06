@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup Mail Intake Feedback SQLite
+[Service]
+Type=oneshot
+User=mail-feedback
+Group=mail-feedback
+UMask=0077
+Environment=FEEDBACK_DATA=/var/lib/mail-intake-feedback
+ExecStart=/usr/bin/python3 /opt/mail-intake-feedback/server.py --backup
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/mail-intake-feedback
+ProtectHome=true

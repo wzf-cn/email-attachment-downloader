@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms><ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyName>MailIntake</AssemblyName><Product>邮件接收管理</Product><Version>1.1.0</Version>
+    <AssemblyName>MailIntake</AssemblyName><Product>邮件接收管理</Product><Version>1.2.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../MailIntake.Core/MailIntake.Core.csproj" />
