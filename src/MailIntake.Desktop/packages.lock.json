@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows7.0": {
+      "AntdUI": {
+        "type": "Direct",
+        "requested": "[2.4.8, )",
+        "resolved": "2.4.8",
+        "contentHash": "ACSIdZFWIs16piiPP0NbHCuwALQPJueRBG/nfXb7/qdC6tugjKS5OyvZMyJc0f3Vn48areGJQGT4AMlAiipuXw=="
+      },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
         "resolved": "2.6.2",

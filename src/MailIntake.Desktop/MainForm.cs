@@ -6,6 +6,8 @@ namespace MailIntake.Desktop;
 
 internal sealed class MainForm : Form
 {
+    private readonly PageDeck navigation;
+    internal PageDeck Navigation=>navigation;
     private Settings settings;
     private Settings activeSettings;
     private readonly StateStore store;
@@ -29,30 +31,34 @@ internal sealed class MainForm : Form
     public MainForm(bool smoke=false)
     {
         this.smoke=smoke; settings=LocalSettings.Load();activeSettings=settings.Snapshot();store=new(LocalSettings.Database);
-        Text="邮件接收管理 · MailKit";Size=new Size(1150,850);MinimumSize=new Size(960,700);
-        StartPosition=FormStartPosition.CenterScreen;Font=new Font("Microsoft YaHei UI",10);BackColor=Color.FromArgb(245,247,250);
-        var header=new Panel{Dock=DockStyle.Top,Height=54,Padding=new Padding(18,0,18,0),BackColor=Color.FromArgb(245,247,250)};
-        header.Controls.Add(new Label{Text="邮件接收管理",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Font=new Font(Font.FontFamily,14,FontStyle.Bold),ForeColor=Color.FromArgb(38,50,64)});
-        var feedback=new Button{Text="意见反馈",Dock=DockStyle.Right,Width=105,FlatStyle=FlatStyle.Flat,ForeColor=Color.FromArgb(36,90,120)};
-        feedback.FlatAppearance.BorderSize=0;feedback.Click+=(_,_)=>{using var form=new FeedbackForm();form.ShowDialog(this);};header.Controls.Add(feedback);
-        var tabs=new TabControl{Dock=DockStyle.Fill,Padding=new Point(20,9)};
-        var setup=new TabPage("邮箱与规则"){Padding=new Padding(12)};
-        var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=220};
-        split.Panel1.Controls.Add(accounts);split.Panel1.Controls.Add(Toolbar(("绑定邮箱",AddAccount),("编辑",EditAccount),("移除",RemoveAccount),("测试连接（不发信）",TestAccount),("导入旧版配置",ImportLegacy)));
-        split.Panel2.Controls.Add(rules);split.Panel2.Controls.Add(Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder)));
-        setup.Controls.Add(split);tabs.TabPages.Add(setup);
+        Text="邮件接收管理";Size=new Size(1240,880);MinimumSize=new Size(1100,760);
+        StartPosition=FormStartPosition.CenterScreen;Font=new Font("Microsoft YaHei UI",10);BackColor=Design.Background;
+        var header=new Panel{Dock=DockStyle.Top,Height=62,Padding=new Padding(24,4,16,4),BackColor=Color.White};
+        var title=Design.Heading("邮件接收管理",14);title.Dock=DockStyle.Fill;header.Controls.Add(title);
+        var feedback=new ActionButton{Text="意见反馈",Dock=DockStyle.Right,Width=106,BorderWidth=0};
+        feedback.Click+=(_,_)=>{using var form=new FeedbackForm();form.ShowDialog(this);};header.Controls.Add(feedback);title.BringToFront();
+        var tabs=new PageDeck(true);navigation=tabs;
+        var split=new SplitContainer{Size=new Size(1000,550),Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=230,Panel1MinSize=170,Panel2MinSize=180,SplitterWidth=12,BackColor=Design.Background};
+        split.Panel1.Controls.Add(Design.Card("绑定邮箱 · 选中邮箱后管理其规则",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));
+        split.Panel2.Controls.Add(Design.Card("收件规则 · 每组规则使用独立下载目录",rules,Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder))));
+        tabs.AddPage("邮箱与规则",split);
         AddPage(tabs,"归档记录",archives,Toolbar(("刷新",RefreshRecords),("打开选中目录",OpenArchive),("导出 CSV",()=>ExportGrid(archives,"归档记录"))));
         AddPage(tabs,"回复记录",replies,Toolbar(("刷新",RefreshRecords),("导出 CSV",()=>ExportGrid(replies,"回复记录"))));
-        AddPage(tabs,"管理员 · 停收与重置",senders,Toolbar(("刷新",RefreshRecords),("重置选中发件邮箱并恢复接收",ResetSender)));
+        AddPage(tabs,"停收管理",senders,Toolbar(("刷新",RefreshRecords),("重置并恢复接收",ResetSender)));
         AddPage(tabs,"异常与审计",events,Toolbar(("刷新",RefreshRecords),("查看详情",ShowEvent),("导出 CSV",()=>ExportGrid(events,"异常记录"))));
         AddPage(tabs,"运行日志",logs,null);
-        var bottom=new Panel{Dock=DockStyle.Bottom,Height=175,Padding=new Padding(12,6,12,8)};
         interval.Value=settings.IntervalMinutes;maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
-        var options=new FlowLayoutPanel{Dock=DockStyle.Top,Height=68};
-        options.Controls.AddRange([new Label{Text="间隔(分钟)",AutoSize=true,Padding=new Padding(0,5,0,0)},interval,new Label{Text="邮件上限(MB)",AutoSize=true,Padding=new Padding(9,5,0,0)},maxSize,new Label{Text="每小时回复上限",AutoSize=true,Padding=new Padding(9,5,0,0)},maxReplies,autoStart]);
-        options.SetFlowBreak(autoStart,true);options.Controls.Add(reexport);
+        var options=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(8,16,8,16)};
+        options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,220));options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        void Option(string label,Control control){int row=options.RowCount++;control.Margin=new Padding(4,12,4,12);options.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,ForeColor=Design.Ink},0,row);options.Controls.Add(control,1,row);}
+        Option("自动检查间隔（分钟）",interval);Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("开机启动",autoStart);
+        Option("历史邮件",reexport);
+        Option("设置生效",new Label{AutoSize=true,MaximumSize=new Size(570,0),ForeColor=Design.Muted,Text="修改后点击下方“保存并开始”。重新导出仅用于下一次检查，不重复自动回复。邮件上限用于跳过整封大邮件；附件大小在各组规则中设置。"});
+        AddPage(tabs,"运行设置",options,null);
+        var bottom=new Panel{Dock=DockStyle.Bottom,Height=120,Padding=new Padding(20,4,12,4),BackColor=Color.White};
+        status.AutoSize=false;status.Dock=DockStyle.Top;status.Height=46;
         var controls=Toolbar(("保存并开始",SaveStart),("立即检查",CheckNow),("暂停",Pause),("退出软件",ExitApp));controls.Dock=DockStyle.Bottom;
-        bottom.Controls.Add(status);status.Dock=DockStyle.Fill;bottom.Controls.Add(options);bottom.Controls.Add(controls);
+        bottom.Controls.Add(status);bottom.Controls.Add(controls);
         Controls.Add(tabs);Controls.Add(bottom);Controls.Add(header);
         accounts.SelectionChanged+=(_,_)=>RefreshRules();
         accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellDoubleClick+=(_,_)=>EditRule();events.CellDoubleClick+=(_,_)=>ShowEvent();
@@ -62,14 +68,20 @@ internal sealed class MainForm : Form
         timer.Tick+=async(_,_)=>{if(updateExit.WaitOne(0)){ExitApp();return;}if(!exiting&&running&&!busy&&DateTime.Now>=next)await RunCycle();};
         if(!smoke){timer.Start();if(settings.RunOnLaunch){running=true;Log("已恢复保存的自动检查设置。");}}
     }
-    private static DataGridView Grid()=>new(){Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,RowHeadersVisible=false,BackgroundColor=Color.White,BorderStyle=BorderStyle.None,AutoGenerateColumns=true};
+    private static DataGridView Grid()
+    {
+        var grid=new DataGridView{Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,RowHeadersVisible=false,BackgroundColor=Color.White,BorderStyle=BorderStyle.None,AutoGenerateColumns=true,EnableHeadersVisualStyles=false,CellBorderStyle=DataGridViewCellBorderStyle.SingleHorizontal,ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None,GridColor=Color.FromArgb(237,240,245),ColumnHeadersHeight=42,ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing};
+        grid.ColumnHeadersDefaultCellStyle=new DataGridViewCellStyle{BackColor=Color.FromArgb(247,249,252),ForeColor=Design.Muted,Padding=new Padding(10,0,4,0),SelectionBackColor=Color.FromArgb(247,249,252),Font=new Font("Microsoft YaHei UI",9,FontStyle.Bold)};
+        grid.DefaultCellStyle=new DataGridViewCellStyle{ForeColor=Design.Ink,SelectionBackColor=Color.FromArgb(231,241,255),SelectionForeColor=Color.FromArgb(22,90,190),Padding=new Padding(10,4,4,4),Font=new Font("Microsoft YaHei UI",9)};
+        grid.RowTemplate.Height=42;return grid;
+    }
     private FlowLayoutPanel Toolbar(params (string Label,Action Action)[] items)
     {
-        var panel=new FlowLayoutPanel{Dock=DockStyle.Top,Height=43,Padding=new Padding(0,4,0,4)};
-        foreach(var item in items){var button=new Button{Text=item.Label,AutoSize=true,Height=32,Padding=new Padding(8,0,8,0)};button.Click+=(_,_)=>{try{item.Action();}catch(Exception e){MessageBox.Show(this,e.Message,"操作未完成");}};panel.Controls.Add(button);}return panel;
+        var panel=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Padding=new Padding(0,6,0,8)};
+        foreach(var item in items){var button=new ActionButton{Text=item.Label,Width=Math.Max(78,TextRenderer.MeasureText(item.Label,Font).Width+30),Height=36};if(item.Label is "保存并开始" or "绑定邮箱" or "新增规则")button.Type=AntdUI.TTypeMini.Primary;button.Click+=(_,_)=>{try{item.Action();}catch(Exception e){MessageBox.Show(this,e.Message,"操作未完成");}};panel.Controls.Add(button);}return panel;
     }
-    private static void AddPage(TabControl tabs,string name,Control content,Control? tools)
-    {var page=new TabPage(name){Padding=new Padding(12)};page.Controls.Add(content);if(tools!=null)page.Controls.Add(tools);tabs.TabPages.Add(page);}
+    private static void AddPage(PageDeck tabs,string name,Control content,Control? tools)
+    {tabs.AddPage(name,Design.Card(name,content,tools));}
     private int AccountIndex=>accounts.CurrentRow?.Index??-1;
     private int RuleIndex=>rules.CurrentRow?.Index??-1;
     private MailAccount? SelectedAccount=>AccountIndex>=0&&AccountIndex<settings.Accounts.Count?settings.Accounts[AccountIndex]:null;

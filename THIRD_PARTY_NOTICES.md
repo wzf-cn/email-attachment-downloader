@@ -12,3 +12,5 @@ This independent Windows application uses the following components. Upstream not
 - Installer: NSIS 3.12, using zlib compression — zlib/libpng license (see `licenses/NSIS.txt`) — https://nsis.sourceforge.io/
 
 Full upstream license texts are included under `licenses/`. Self-contained runtime files also retain their distributed notices. Review package licenses again when upgrading dependencies.
+
+- AntdUI 2.4.8 — Apache-2.0 — https://github.com/AntdUI/AntdUI (license: licenses/AntdUI.txt).

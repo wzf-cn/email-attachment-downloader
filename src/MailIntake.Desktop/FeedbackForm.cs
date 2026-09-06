@@ -15,11 +15,11 @@ internal sealed class FeedbackForm : EditorForm
         string Read()
         {
             if(string.IsNullOrWhiteSpace(title.Text)||string.IsNullOrWhiteSpace(detail.Text))throw new ArgumentException("请填写标题和具体说明。");
-            return $"标题：{title.Text.Trim()}\n类型：{kind.Text}\n软件版本：1.0.10\n时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}\n\n{detail.Text.Trim()}\n";
+            return $"标题：{title.Text.Trim()}\n类型：{kind.Text}\n软件版本：{Application.ProductVersion.Split('+')[0]}\n时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}\n\n{detail.Text.Trim()}\n";
         }
         void AddAction(string label,Action action)
         {
-            var button=new Button{Text=label,AutoSize=true,Height=34};
+            var button=new ActionButton{Text=label,Width=TextRenderer.MeasureText(label,Font).Width+32,Height=38};
             button.Click+=(_,_)=>{try{action();}catch(Exception e){MessageBox.Show(this,e.Message,"反馈未完成");}};
             Footer.Controls.Add(button);
         }

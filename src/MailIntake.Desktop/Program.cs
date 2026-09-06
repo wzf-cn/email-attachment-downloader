@@ -16,14 +16,24 @@ internal static class Program
             using var form=new MainForm(smoke);
             if(smoke)
             {
+                AntdUI.Config.Animation=false;
                 form.Show();Application.DoEvents();
-                using var account=new AccountEditor();account.Show(form);Application.DoEvents();account.Close();
-                using var feedback=new FeedbackForm();feedback.Show(form);Application.DoEvents();feedback.Close();
                 string? capture=Environment.GetEnvironmentVariable("MAILINTAKE_CAPTURE");
-                using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);Application.DoEvents();
-                if(!string.IsNullOrEmpty(capture)){using var bitmap=new Bitmap(rule.Width,rule.Height);rule.DrawToBitmap(bitmap,new Rectangle(Point.Empty,rule.Size));bitmap.Save(Path.ChangeExtension(capture,"rule.png"));}
-                rule.Close();
-                if(!string.IsNullOrEmpty(capture)){using var bitmap=new Bitmap(form.Width,form.Height);form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,form.Size));bitmap.Save(capture);}
+                void Capture(Form target,string suffix)
+                {
+                    Application.DoEvents();
+                    if(string.IsNullOrEmpty(capture))return;
+                    using var bitmap=new Bitmap(target.Width,target.Height);target.DrawToBitmap(bitmap,new Rectangle(Point.Empty,target.Size));
+                    bitmap.Save(suffix==""?capture:Path.ChangeExtension(capture,suffix+".png"));
+                }
+                using var account=new AccountEditor();account.Show(form);Capture(account,"account");
+                account.Sections!.SelectPage(1);Capture(account,"servers");account.Close();
+                using var feedback=new FeedbackForm();feedback.Show(form);Capture(feedback,"feedback");feedback.Close();
+                using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);
+                for(int i=0;i<rule.Sections!.PageCount;i++){rule.Sections.SelectPage(i);Capture(rule,"rule"+i);}
+                rule.Size=rule.MinimumSize;rule.Sections.SelectPage(1);Capture(rule,"rule-small");rule.Close();
+                for(int i=0;i<form.Navigation.PageCount;i++){form.Navigation.SelectPage(i);Capture(form,"page"+i);}
+                form.Navigation.SelectPage(0);Capture(form,"");form.Size=form.MinimumSize;Capture(form,"small");
                 File.WriteAllText(Path.Combine(LocalSettings.Root,"smoke-result.txt"),"WINDOWS_FORMS_SMOKE_OK");return;
             }
             if(args.Contains("--background"))form.Shown+=(_,_)=>form.Hide();

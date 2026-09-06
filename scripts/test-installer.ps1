@@ -4,7 +4,7 @@ $testRoot = Join-Path $env:TEMP ('MailIntake-installer-' + [guid]::NewGuid().ToS
 $installDir = Join-Path $testRoot 'program'
 $testRegistry = 'HKCU:\Software\MailIntakeInstallerTest'
 if (Test-Path $testRegistry) { throw 'An earlier installer test registration exists; inspect it first.' }
-if (@(Get-Process MailIntake -ErrorAction SilentlyContinue).Count -gt 0) { throw 'Close the running application before installer tests.' }
+# TestPackage uses its own install path, registry keys and MailIntakeInstallerTestApp mutex; the real application may remain running.
 $setup = Join-Path $projectRoot 'artifacts\installer-build\MailIntake-TestSetup.exe'
 $env:MAILINTAKE_TEST_HOME = Join-Path $testRoot 'data'
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
