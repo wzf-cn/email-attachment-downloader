@@ -33,6 +33,8 @@ internal sealed class MainForm : Form
         StartPosition=FormStartPosition.CenterScreen;Font=new Font("Microsoft YaHei UI",10);BackColor=Color.FromArgb(245,247,250);
         var header=new Panel{Dock=DockStyle.Top,Height=54,Padding=new Padding(18,0,18,0),BackColor=Color.FromArgb(245,247,250)};
         header.Controls.Add(new Label{Text="邮件接收管理",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Font=new Font(Font.FontFamily,14,FontStyle.Bold),ForeColor=Color.FromArgb(38,50,64)});
+        var feedback=new Button{Text="意见反馈",Dock=DockStyle.Right,Width=105,FlatStyle=FlatStyle.Flat,ForeColor=Color.FromArgb(36,90,120)};
+        feedback.FlatAppearance.BorderSize=0;feedback.Click+=(_,_)=>{using var form=new FeedbackForm();form.ShowDialog(this);};header.Controls.Add(feedback);
         var tabs=new TabControl{Dock=DockStyle.Fill,Padding=new Point(20,9)};
         var setup=new TabPage("邮箱与规则"){Padding=new Padding(12)};
         var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=220};

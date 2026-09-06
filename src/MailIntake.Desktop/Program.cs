@@ -18,6 +18,7 @@ internal static class Program
             {
                 form.Show();Application.DoEvents();
                 using var account=new AccountEditor();account.Show(form);Application.DoEvents();account.Close();
+                using var feedback=new FeedbackForm();feedback.Show(form);Application.DoEvents();feedback.Close();
                 string? capture=Environment.GetEnvironmentVariable("MAILINTAKE_CAPTURE");
                 using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);Application.DoEvents();
                 if(!string.IsNullOrEmpty(capture)){using var bitmap=new Bitmap(rule.Width,rule.Height);rule.DrawToBitmap(bitmap,new Rectangle(Point.Empty,rule.Size));bitmap.Save(Path.ChangeExtension(capture,"rule.png"));}
