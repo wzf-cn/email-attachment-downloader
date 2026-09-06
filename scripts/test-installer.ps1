@@ -25,7 +25,16 @@ $before = (Get-FileHash -LiteralPath $config).Hash
 Set-Content -LiteralPath (Join-Path $installDir 'user-download.txt') -Value 'preserve this user file'
 Install-Test
 if ((Get-FileHash -LiteralPath $config).Hash -ne $before) { throw 'Upgrade changed configuration' }
-$lock=[Threading.Mutex]::new($true,'Local\KeywordMailDownloader')
+$dll=Join-Path $installDir 'Accessibility.dll'
+$originalHash=(Get-FileHash -LiteralPath $dll).Hash
+$fileLock=[IO.File]::Open($dll,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
+try {
+    $blocked=Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -PassThru -Wait -WindowStyle Hidden
+    if ($blocked.ExitCode -ne 3) { throw 'Locked DLL did not stop installation before replacement' }
+} finally { $fileLock.Dispose() }
+if ((Get-FileHash -LiteralPath $dll).Hash -ne $originalHash) { throw 'Locked DLL was modified' }
+Install-Test
+$lock=[Threading.Mutex]::new($true,'Local\MailIntakeInstallerTestApp')
 try {
     $blocked=Start-Process -FilePath $setup -ArgumentList @('/S',"/D=$installDir") -PassThru -Wait -WindowStyle Hidden
     if ($blocked.ExitCode -eq 0) { throw 'Silent update did not refuse a running application' }

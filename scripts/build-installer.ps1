@@ -1,4 +1,4 @@
-param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage, [string]$Version='1.0.10')
+param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage, [string]$Version='1.0.11')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $releaseRoot = Join-Path $projectRoot 'artifacts\win-x64'
@@ -8,6 +8,7 @@ if (!(Test-Path (Join-Path $releaseRoot 'MailIntake.exe'))) { throw 'Build the d
 $files = @(Get-ChildItem -LiteralPath $releaseRoot -Recurse -File | Where-Object { $_.Name -notin @('Update.cmd','update-files.json') })
 $install = [Collections.Generic.List[string]]::new()
 $delete = [Collections.Generic.List[string]]::new()
+$checks = [Collections.Generic.List[string]]::new()
 $dirs = [Collections.Generic.HashSet[string]]::new()
 foreach ($file in $files) {
     $relative = $file.FullName.Substring($releaseRoot.Length + 1)
@@ -15,11 +16,15 @@ foreach ($file in $files) {
     $install.Add('SetOutPath "$INSTDIR\' + $parent + '"')
     $install.Add('File "' + $file.FullName + '"')
     $delete.Add('Delete "$INSTDIR\' + $relative + '"')
+    $checks.Add('Push "$INSTDIR\' + $relative + '"')
+    $checks.Add('Call CheckWritable')
     while ($parent) { $null = $dirs.Add($parent); $parent = Split-Path $parent -Parent }
 }
 foreach ($dir in ($dirs | Sort-Object Length -Descending)) { $delete.Add('RMDir "$INSTDIR\' + $dir + '"') }
 $installPath = Join-Path $generated 'install.nsh'
 $deletePath = Join-Path $generated 'delete.nsh'
+$checkPath = Join-Path $generated 'checks.nsh'
+$checks | Set-Content -LiteralPath $checkPath -Encoding utf8
 $install | Set-Content -LiteralPath $installPath -Encoding utf8
 $delete | Set-Content -LiteralPath $deletePath -Encoding utf8
 $output = Join-Path $projectRoot "artifacts\MailIntake-Setup-$Version.exe"
@@ -27,8 +32,8 @@ $options = @('/V2', "/DOUTPUT=$output", "/DINSTALLFILES=$installPath", "/DDELETE
 if ($TestPackage) {
     $output = Join-Path $generated 'MailIntake-TestSetup.exe'
     $options[1] = "/DOUTPUT=$output"
-    $options += @('/DAPPKEY=MailIntakeInstallerTest','/DAPPNAME=MailIntake Installer Test')
+    $options += @('/DAPPKEY=MailIntakeInstallerTest','/DAPPNAME=MailIntake Installer Test','/DAPPMUTEX=MailIntakeInstallerTestApp')
 }
-& $MakeNsis @options "/DVERSION=$Version" /INPUTCHARSET UTF8 (Join-Path $PSScriptRoot 'installer.nsi')
+& $MakeNsis @options "/DCHECKFILES=$checkPath" "/DVERSION=$Version" /INPUTCHARSET UTF8 (Join-Path $PSScriptRoot 'installer.nsi')
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
 Get-FileHash -LiteralPath $output -Algorithm SHA256

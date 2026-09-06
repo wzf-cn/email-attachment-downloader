@@ -8,6 +8,9 @@ Unicode true
 !ifndef APPNAME
 !define APPNAME "邮件接收管理"
 !endif
+!ifndef APPMUTEX
+!define APPMUTEX "KeywordMailDownloader"
+!endif
 Name "${APPNAME}"
 OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\${APPKEY}"
@@ -26,6 +29,35 @@ SetCompressor /SOLID zlib
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "SimpChinese"
 Var AppLock
+Var InstallerLock
+
+Function CheckWritable
+  Pop $R0
+  IfFileExists "$R0" 0 done
+  StrCpy $R2 0
+  check:
+    ; OPEN_EXISTING only: verify access without truncating or writing the file.
+    System::Call 'kernel32::CreateFileW(w "$R0", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r1'
+    StrCpy $R1 $1
+    ${If} $R1 != -1
+      System::Call 'kernel32::CloseHandle(p r1)'
+      Goto done
+    ${EndIf}
+    IfSilent failed
+    IntOp $R2 $R2 + 1
+    ${If} $R2 < 120
+      Sleep 500
+      Goto check
+    ${EndIf}
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "文件仍被占用或不可写，尚未开始替换程序：$\r$\n$R0$\r$\n请关闭旧软件后重试；取消可安全停止本次更新。" IDRETRY restart
+    failed:
+      SetErrorLevel 3
+      Abort
+    restart:
+      StrCpy $R2 0
+      Goto check
+  done:
+FunctionEnd
 
 Function LaunchApplication
   ; The app must be able to create its single-instance mutex before launch.
@@ -39,7 +71,7 @@ FunctionEnd
 
 !macro StopApp Prefix
 Function ${Prefix}StopApp
-  System::Call 'kernel32::OpenMutexW(i 0x100001, i 0, w "Local\KeywordMailDownloader") p .r0'
+  System::Call 'kernel32::OpenMutexW(i 0x100001, i 0, w "Local\${APPMUTEX}") p .r0'
   ${If} $0 != 0
     IfSilent decline
     MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "邮件软件正在运行。是否退出软件以便继续？请先保存界面中的修改。" IDNO decline
@@ -64,7 +96,7 @@ Function ${Prefix}StopApp
       SetErrorLevel 2
       Abort
   ${EndIf}
-  System::Call 'kernel32::CreateMutexW(p 0, i 1, w "Local\KeywordMailDownloader") p .r0 ?e'
+  System::Call 'kernel32::CreateMutexW(p 0, i 1, w "Local\${APPMUTEX}") p .r0 ?e'
   Pop $1
   ${If} $0 == 0
   ${OrIf} $1 == 183
@@ -79,6 +111,16 @@ FunctionEnd
 !insertmacro StopApp "un."
 
 Function .onInit
+  System::Call 'kernel32::CreateMutexW(p 0, i 1, w "Local\${APPKEY}Installer") p .r0 ?e'
+  Pop $1
+  StrCpy $InstallerLock $0
+  ${If} $0 == 0
+  ${OrIf} $1 == 183
+    IfSilent +2
+    MessageBox MB_OK "另一个安装程序正在运行，请先完成或取消该安装。"
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
   ${IfNot} ${RunningX64}
     MessageBox MB_OK "本安装包需要 64 位 Windows。"
     Abort
@@ -91,6 +133,10 @@ FunctionEnd
 
 Section "安装"
   Call StopApp
+  DetailPrint "正在确认原程序文件已释放…"
+  !include "${CHECKFILES}"
+  Push "$INSTDIR\Uninstall.exe"
+  Call CheckWritable
   SetOutPath "$INSTDIR"
   !include "${INSTALLFILES}"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
