@@ -23,6 +23,7 @@ internal sealed class MainForm : Form
     private bool busy, running, exiting;
     private DateTime next=DateTime.MinValue;
     private readonly bool smoke;
+    private readonly EventWaitHandle updateExit=new(false,EventResetMode.AutoReset,"Local\\MailIntakeUpdateExit");
     public MainForm(bool smoke=false)
     {
         this.smoke=smoke; settings=LocalSettings.Load();activeSettings=settings.Snapshot();store=new(LocalSettings.Database);
@@ -54,7 +55,7 @@ internal sealed class MainForm : Form
         RefreshAccounts();RefreshRecords();
         var menu=new ContextMenuStrip();menu.Items.Add("显示窗口",null,(_,_)=>ShowWindow());menu.Items.Add("暂停检查",null,(_,_)=>Pause());menu.Items.Add("退出",null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
         FormClosing+=(_,e)=>{if(!exiting&&!smoke){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"邮件接收管理","已转到托盘运行。右键托盘图标可退出。",ToolTipIcon.Info);}};
-        timer.Tick+=async(_,_)=>{if(running&&!busy&&DateTime.Now>=next)await RunCycle();};
+        timer.Tick+=async(_,_)=>{if(updateExit.WaitOne(0)){ExitApp();return;}if(!exiting&&running&&!busy&&DateTime.Now>=next)await RunCycle();};
         if(!smoke){timer.Start();if(settings.RunOnLaunch){running=true;Log("已恢复保存的自动检查设置。");}}
     }
     private static DataGridView Grid()=>new(){Dock=DockStyle.Fill,ReadOnly=true,AllowUserToAddRows=false,AllowUserToDeleteRows=false,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,SelectionMode=DataGridViewSelectionMode.FullRowSelect,MultiSelect=false,RowHeadersVisible=false,BackgroundColor=Color.White,BorderStyle=BorderStyle.None,AutoGenerateColumns=true};
@@ -163,6 +164,13 @@ internal sealed class MainForm : Form
         if(text.StartsWith("异常：")){tray.ShowBalloonTip(4000,"邮件接收管理 · 异常提醒",text,ToolTipIcon.Warning);Text="【有异常】邮件接收管理 · MailKit";}
     }
     public void ShowWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
-    private void ExitApp(){exiting=true;running=false;cancellation?.Cancel();timer.Stop();tray.Visible=false;Close();}
-    protected override void Dispose(bool disposing){if(disposing){tray.Dispose();timer.Dispose();cancellation?.Cancel();}base.Dispose(disposing);}
+    private async void ExitApp()
+    {
+        if(exiting)return;
+        exiting=true;running=false;timer.Stop();cancellation?.Cancel();
+        Enabled=false;status.Text="正在等待当前邮件处理结束，以便安全退出…";
+        while(busy)await Task.Delay(100);
+        tray.Visible=false;Close();
+    }
+    protected override void Dispose(bool disposing){if(disposing){tray.Dispose();timer.Dispose();updateExit.Dispose();cancellation?.Cancel();}base.Dispose(disposing);}
 }

@@ -27,5 +27,16 @@ internal static class SmokeChecks
         if(!before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(configPath))))throw new Exception("Legacy configuration was changed");
         LocalSettings.Save(new Settings{Accounts=accounts,RunOnLaunch=false});
         if(LocalSettings.Load().Accounts.Count!=1)throw new Exception("Configuration roundtrip failed");
+        string updateSource=Path.Combine(LocalSettings.Root,"update-source"),updateTarget=Path.Combine(LocalSettings.Root,"update-target");
+        Directory.CreateDirectory(updateSource);Directory.CreateDirectory(updateTarget);
+        File.WriteAllText(Path.Combine(updateSource,"program.bin"),"new");
+        File.WriteAllText(Path.Combine(updateTarget,"program.bin"),"old");
+        File.WriteAllText(Path.Combine(updateTarget,"user-data.txt"),"preserve");
+        Updater.Install(updateSource,updateTarget,["program.bin"]);
+        if(File.ReadAllText(Path.Combine(updateTarget,"program.bin"))!="new"||File.ReadAllText(Path.Combine(updateTarget,"user-data.txt"))!="preserve")throw new Exception("Update preservation failed");
+        File.WriteAllText(Path.Combine(updateSource,"program.bin"),"next");
+        try{Updater.Install(updateSource,updateTarget,["program.bin","missing.bin"]);throw new Exception("Expected update failure");}
+        catch(IOException){}
+        if(File.ReadAllText(Path.Combine(updateTarget,"program.bin"))!="new"||File.ReadAllText(Path.Combine(updateTarget,"user-data.txt"))!="preserve")throw new Exception("Update rollback failed");
     }
 }

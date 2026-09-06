@@ -19,6 +19,12 @@ SMTP 默认配置：QQ 为 `smtp.qq.com`，163 为 `smtp.163.com`，126 为 `smt
 
 这些 SMTP 参数已对照 [Thunderbird ISPDB](https://github.com/thunderbird/autoconfig/tree/master/ispdb) 与 [Nodemailer](https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json) 一致；配置一致不代表已通过真实账户收发测试。
 
+## 更新软件
+
+将新版解压到一个独立文件夹，双击其中的 `Update.cmd`，选择原软件所在目录。检测到原软件正在运行时，询问是否退出并继续更新；选择“否”不修改文件，选择“是”请求原软件安全退出，等待当前处理结束后再替换程序。尚未保存的界面修改需先保存。等待超过 60 秒则取消本次文件替换，不强制结束进程。
+
+首次从不支持自动退出的旧版本升级时，需要从托盘手动退出一次；安装本版后，后续更新支持自动退出。更新只替换发布清单内的程序文件，保留用户目录、数据库以及下载内容，失败时尝试恢复原程序。更新成功后从原位置启动软件。直接用解压工具覆盖不会触发本提示。
+
 ## 主题规则
 
 示例：`工程实践-张三-20260001`

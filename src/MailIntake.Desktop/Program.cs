@@ -6,6 +6,7 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if(args.Contains("--update")){Updater.Run();return;}
         bool smoke=args.Contains("--smoke-test");
         using var mutex=new Mutex(true,smoke?"Local\\MailIntakeSmoke":"Local\\KeywordMailDownloader",out bool created);
         if(!created){MessageBox.Show("邮件软件已运行，请从托盘打开；升级前请先退出旧版。","邮件接收管理");return;}
