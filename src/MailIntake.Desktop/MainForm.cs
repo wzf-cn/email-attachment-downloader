@@ -22,6 +22,7 @@ internal sealed class MainForm : Form
     private readonly CheckBox reexport=new(){Text="忽略之前的记录，重新导出（仅本次，不回复）",AutoSize=true};
     private CancellationTokenSource? cancellation;
     private bool busy, running, exiting;
+    private int cycleAnomalies;
     private DateTime next=DateTime.MinValue;
     private readonly bool smoke;
     private readonly EventWaitHandle updateExit=new(false,EventResetMode.AutoReset,"Local\\MailIntakeUpdateExit");
@@ -114,7 +115,7 @@ internal sealed class MainForm : Form
     private void Pause(){running=false;cancellation?.Cancel();settings.RunOnLaunch=false;activeSettings.RunOnLaunch=false;LocalSettings.Save(activeSettings);Log("已暂停。已进入发送阶段的结果可能需人工核实。");}
     private async Task RunCycle()
     {
-        busy=true;cancellation=new();var snapshot=activeSettings.Snapshot();int processed=0;
+        busy=true;cycleAnomalies=0;cancellation=new();var snapshot=activeSettings.Snapshot();int processed=0;
         bool exportAgain=requestedReexport;requestedReexport=false;
         try
         {
@@ -131,11 +132,22 @@ internal sealed class MainForm : Form
                     }
                 }
                 catch(OperationCanceledException){break;}
-                catch(Exception e){store.Event("连接或处理失败","",account.Address,e.GetType().Name+"；请检查配置、网络及回复记录。");Log(account.Address+"："+e.GetType().Name+"，其他邮箱将继续检查。");}
+                catch(Exception e){store.Event("连接或处理失败","",account.Address,e.GetType().Name+"；请检查配置、网络及回复记录。");Log("异常："+account.Address+"："+e.GetType().Name+"，其他邮箱将继续检查。");}
                 if(!exportAgain&&processed>=snapshot.MaxPerCycle)break;
             }
         }
-        finally{busy=false;cancellation.Dispose();cancellation=null;next=DateTime.Now.AddMinutes(snapshot.IntervalMinutes);RefreshRecords();Log($"本轮处理 {processed} 封；"+(running?"下一次 "+next.ToString("HH:mm:ss"):"已暂停"));}
+        finally
+        {
+            busy=false;cancellation.Dispose();cancellation=null;next=DateTime.Now.AddMinutes(snapshot.IntervalMinutes);RefreshRecords();
+            Log($"本轮处理 {processed} 封；"+(running?"下一次 "+next.ToString("HH:mm:ss"):"已暂停"));
+            if(cycleAnomalies>0)
+            {
+                string summary=$"本轮检查发现 {cycleAnomalies} 条异常提示，请到“异常与审计”查看详情。";
+                Log(summary);
+                if(!exiting&&!smoke)tray.ShowBalloonTip(5000,"邮件接收管理 · 异常汇总",summary,ToolTipIcon.Warning);
+            }
+            cycleAnomalies=0;
+        }
     }
     private void RefreshRecords()
     {
@@ -165,7 +177,7 @@ internal sealed class MainForm : Form
         if(InvokeRequired){BeginInvoke(()=>Log(text));return;}
         status.Text=text;logs.AppendText(DateTime.Now.ToString("HH:mm:ss ")+text+Environment.NewLine);
         if(logs.TextLength>100000)logs.Text=logs.Text[^80000..];
-        if(text.StartsWith("异常：")){tray.ShowBalloonTip(4000,"邮件接收管理 · 异常提醒",text,ToolTipIcon.Warning);Text="【有异常】邮件接收管理 · MailKit";}
+        if(text.StartsWith("异常：")){if(busy)cycleAnomalies++;Text="【有异常】邮件接收管理 · MailKit";}
     }
     public void ShowWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
     private async void ExitApp()
