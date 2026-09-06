@@ -93,7 +93,8 @@ internal sealed class RuleEditor : EditorForm
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var prefix=TextField("固定开头",source.Prefix);
         var separator=TextField("字段分隔符",source.Separator);
-        var fields=TextField("中间字段（逗号分隔）",string.Join(',',source.Fields));
+        var fields=TextField("主题中需填写的信息",string.Join(',',source.Fields));
+        Field("填写示例",new Label{AutoSize=true,Text="例如主题为“工程实践-张三-00123”：固定开头填“工程实践”，此处填“姓名”，结尾用学号名单校验。此处填写信息名称，不是具体姓名；多个名称用逗号分隔，例如“姓名,班级”。"});
         var keyMode=Choice("结尾校验",source.KeyMode,"名单","固定秘钥");
         var subjectKey=TextField("固定秘钥",source.SubjectKey,true);
         var roster=new Dictionary<string,string>(source.Roster);

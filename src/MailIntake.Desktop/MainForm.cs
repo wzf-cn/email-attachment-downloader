@@ -19,6 +19,7 @@ internal sealed class MainForm : Form
     private readonly NumericUpDown maxSize=new(){Minimum=1,Maximum=500,Width=75};
     private readonly NumericUpDown maxReplies=new(){Minimum=1,Maximum=10000,Width=75};
     private readonly CheckBox autoStart=new(){Text="登录 Windows 后自动运行",AutoSize=true};
+    private readonly CheckBox reexport=new(){Text="忽略之前的记录，重新导出（仅本次，不回复）",AutoSize=true};
     private CancellationTokenSource? cancellation;
     private bool busy, running, exiting;
     private DateTime next=DateTime.MinValue;
@@ -43,10 +44,11 @@ internal sealed class MainForm : Form
         AddPage(tabs,"管理员 · 停收与重置",senders,Toolbar(("刷新",RefreshRecords),("重置选中发件邮箱并恢复接收",ResetSender)));
         AddPage(tabs,"异常与审计",events,Toolbar(("刷新",RefreshRecords),("查看详情",ShowEvent),("导出 CSV",()=>ExportGrid(events,"异常记录"))));
         AddPage(tabs,"运行日志",logs,null);
-        var bottom=new Panel{Dock=DockStyle.Bottom,Height=145,Padding=new Padding(12,6,12,8)};
+        var bottom=new Panel{Dock=DockStyle.Bottom,Height=175,Padding=new Padding(12,6,12,8)};
         interval.Value=settings.IntervalMinutes;maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
-        var options=new FlowLayoutPanel{Dock=DockStyle.Top,Height=36};
+        var options=new FlowLayoutPanel{Dock=DockStyle.Top,Height=68};
         options.Controls.AddRange([new Label{Text="间隔(分钟)",AutoSize=true,Padding=new Padding(0,5,0,0)},interval,new Label{Text="邮件上限(MB)",AutoSize=true,Padding=new Padding(9,5,0,0)},maxSize,new Label{Text="每小时回复上限",AutoSize=true,Padding=new Padding(9,5,0,0)},maxReplies,autoStart]);
+        options.SetFlowBreak(autoStart,true);options.Controls.Add(reexport);
         var controls=Toolbar(("保存并开始",SaveStart),("立即检查",CheckNow),("暂停",Pause),("退出软件",ExitApp));controls.Dock=DockStyle.Bottom;
         bottom.Controls.Add(status);status.Dock=DockStyle.Fill;bottom.Controls.Add(options);bottom.Controls.Add(controls);
         Controls.Add(tabs);Controls.Add(bottom);Controls.Add(header);
@@ -105,13 +107,15 @@ internal sealed class MainForm : Form
         if(settings.Accounts.Count==0)throw new ArgumentException("请先绑定邮箱。");
         foreach(var a in settings.Accounts)foreach(var r in a.Rules)RuleValidator.Check(r);
         settings.IntervalMinutes=(int)interval.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
-        LocalSettings.Save(settings);LocalSettings.Startup(settings.AutoStart);activeSettings=settings.Snapshot();running=true;next=DateTime.MinValue;Log("已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。");
+        LocalSettings.Save(settings);LocalSettings.Startup(settings.AutoStart);activeSettings=settings.Snapshot();requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;Log(requestedReexport?"本次重新导出：按开始日期扫描，不重复回复，停收限制仍有效。":"已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。");
     }
-    private void CheckNow(){if(!settings.RunOnLaunch){MessageBox.Show(this,"请先保存设置并开始。");return;}running=true;next=DateTime.MinValue;}
+    private void CheckNow(){if(busy){MessageBox.Show(this,"请等待本轮结束后再检查或重新导出。");return;}if(!settings.RunOnLaunch){MessageBox.Show(this,"请先保存设置并开始。");return;}requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;}
+    private bool requestedReexport;
     private void Pause(){running=false;cancellation?.Cancel();settings.RunOnLaunch=false;activeSettings.RunOnLaunch=false;LocalSettings.Save(activeSettings);Log("已暂停。已进入发送阶段的结果可能需人工核实。");}
     private async Task RunCycle()
     {
         busy=true;cancellation=new();var snapshot=activeSettings.Snapshot();int processed=0;
+        bool exportAgain=requestedReexport;requestedReexport=false;
         try
         {
             var engine=new IntakeEngine(store,gateway);
@@ -122,13 +126,13 @@ internal sealed class MainForm : Form
                 {
                     await foreach(var incoming in gateway.Scan(account,cancellation.Token))
                     {
-                        if(await engine.ProcessAsync(account,incoming,snapshot,Log,cancellation.Token))processed++;
-                        if(processed>=snapshot.MaxPerCycle)break;
+                        if(await engine.ProcessAsync(account,incoming,snapshot,Log,cancellation.Token,exportAgain))processed++;
+                        if(!exportAgain&&processed>=snapshot.MaxPerCycle)break;
                     }
                 }
                 catch(OperationCanceledException){break;}
                 catch(Exception e){store.Event("连接或处理失败","",account.Address,e.GetType().Name+"；请检查配置、网络及回复记录。");Log(account.Address+"："+e.GetType().Name+"，其他邮箱将继续检查。");}
-                if(processed>=snapshot.MaxPerCycle)break;
+                if(!exportAgain&&processed>=snapshot.MaxPerCycle)break;
             }
         }
         finally{busy=false;cancellation.Dispose();cancellation=null;next=DateTime.Now.AddMinutes(snapshot.IntervalMinutes);RefreshRecords();Log($"本轮处理 {processed} 封；"+(running?"下一次 "+next.ToString("HH:mm:ss"):"已暂停"));}

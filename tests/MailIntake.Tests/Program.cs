@@ -2,6 +2,21 @@ using MailIntake.Core;
 using MimeKit;
 using System.Text;
 
+if(args.Length==3&&args[0]=="--repair-export")
+{
+    int count=0,attachments=0,cloud=0;
+    foreach(string path in Directory.GetFiles(args[1],"original.eml",SearchOption.AllDirectories))
+    {
+        var message=await MimeMessage.LoadAsync(path);
+        string metaPath=Path.Combine(Path.GetDirectoryName(path)!,"metadata.json");
+        var old=System.Text.Json.JsonSerializer.Deserialize<ArchiveRecord>(File.ReadAllText(metaPath))!;
+        string id=Constants.Hash(path);
+        var incoming=new Incoming(id,message.Subject??"无主题",old.Sender,old.ReceivedAt,new FileInfo(path).Length,message,_=>Task.FromResult(message));
+        var record=await IntakeEngine.ArchiveAsync(new(){Address=old.Account},incoming,message,new(){Name=old.Rule,Output=args[2]},old.Id,CancellationToken.None);
+        count++;attachments+=record.Attachments.Count;if(AttachmentExport.CloudLinks(message).Count>0)cloud++;
+    }
+    Console.WriteLine($"LOCAL_EXPORT_OK messages={count} attachments={attachments} cloudLinkMessages={cloud}");return;
+}
 var suite=new Suite();await suite.Run();
 
 sealed class FakeSender : IReplySender
@@ -45,6 +60,21 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("re-export preserves previous files and never sends replies or counts errors",async()=>
+        {
+            var f=new Fixture();var m=f.Mail("reexport",attach:true);await f.Process(m);
+            string old=f.Store.Archives().Single().Directory;
+            await f.Engine.ProcessAsync(f.Account,m,f.Settings,_=>{},CancellationToken.None,true);
+            var current=f.Store.Archives().Single();Eq(true,Directory.Exists(old));Eq(false,old==current.Directory);Eq(true,Path.GetFileName(current.Directory).StartsWith(m.Subject));Eq(1,f.Sender.Sent.Count);
+            await f.Engine.ProcessAsync(f.Account,f.Mail("bad-reexport","工程实践-张三"),f.Settings,_=>{},CancellationToken.None,true);
+            Eq(0,f.Store.Senders().Count());
+        });
+        await Test("inline named and unnamed binary attachments exported; cloud links explicit",async()=>
+        {
+            var f=new Fixture();var m=f.Mail("inline");
+            m.Header.Body=new Multipart("mixed") {new TextPart("html"){Text="超大附件 <a href=\"https://wx.mail.qq.com/download?x=1&amp;y=2\">下载</a>"},new MimePart("application","pdf"){Content=new MimeContent(new MemoryStream(Encoding.UTF8.GetBytes("pdf-data"))),ContentDisposition=new ContentDisposition("inline"),FileName="报告.pdf"},new MimePart("application","octet-stream"){Content=new MimeContent(new MemoryStream([1,2,3]))}};
+            await f.Process(m);var record=f.Store.Archives().Single();Eq(2,record.Attachments.Count);Eq(true,File.ReadAllText(Path.Combine(record.Directory,"云附件下载链接.txt")).Contains("x=1&y=2"));
+        });
         await Test("subject parsing and roster/name validation",()=>
         {
             var f=new Fixture();

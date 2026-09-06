@@ -1,4 +1,4 @@
-param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage)
+param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage, [string]$Version='1.0.1')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $releaseRoot = Join-Path $projectRoot 'artifacts\win-x64'
@@ -22,13 +22,13 @@ $installPath = Join-Path $generated 'install.nsh'
 $deletePath = Join-Path $generated 'delete.nsh'
 $install | Set-Content -LiteralPath $installPath -Encoding utf8
 $delete | Set-Content -LiteralPath $deletePath -Encoding utf8
-$output = Join-Path $projectRoot 'artifacts\MailIntake-Setup-1.0.0.exe'
+$output = Join-Path $projectRoot "artifacts\MailIntake-Setup-$Version.exe"
 $options = @('/V2', "/DOUTPUT=$output", "/DINSTALLFILES=$installPath", "/DDELETEFILES=$deletePath")
 if ($TestPackage) {
     $output = Join-Path $generated 'MailIntake-TestSetup.exe'
     $options[1] = "/DOUTPUT=$output"
     $options += @('/DAPPKEY=MailIntakeInstallerTest','/DAPPNAME=MailIntake Installer Test')
 }
-& $MakeNsis @options /INPUTCHARSET UTF8 (Join-Path $PSScriptRoot 'installer.nsi')
+& $MakeNsis @options "/DVERSION=$Version" /INPUTCHARSET UTF8 (Join-Path $PSScriptRoot 'installer.nsi')
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed' }
 Get-FileHash -LiteralPath $output -Algorithm SHA256

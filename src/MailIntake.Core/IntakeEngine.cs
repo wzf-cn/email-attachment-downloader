@@ -20,18 +20,19 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         if(new[]{"bulk","list","junk"}.Contains((m.Headers["Precedence"]??"").ToLowerInvariant())) return false;
         return !new[]{"no-reply","noreply","mailer-daemon","postmaster"}.Contains(incoming.Sender.Split('@')[0].ToLowerInvariant());
     }
-    public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token)
+    public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token,bool reexport=false)
     {
         token.ThrowIfCancellationRequested();
         string from=incoming.Sender.ToLowerInvariant();
-        if(store.IsHandled(incoming.Id)) return false;
-        if(store.IsBlocked(from)) { store.Mark(incoming.Id,"Blocked",from,account.Address); return true; }
+        if(!reexport && store.IsHandled(incoming.Id)) return false;
+        if(store.IsBlocked(from)) { if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
         var candidates=account.Rules.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r))).Where(x=>x.Result!=Validation.Ignore).ToList();
         if(candidates.Count==0) return false;
         var selected=candidates.FirstOrDefault(x=>x.Result==Validation.Success);
         if(selected.Rule is null) selected=candidates[0];
         bool valid=selected.Result==Validation.Success;
-        bool canReply=CanReply(incoming,settings.Accounts.Select(a=>a.Address.ToLowerInvariant()).ToHashSet());
+        if(reexport&&!valid)return false;
+        bool canReply=!reexport&&CanReply(incoming,settings.Accounts.Select(a=>a.Address.ToLowerInvariant()).ToHashSet());
         bool justBlocked=false;
         if(!valid)
         {
@@ -54,10 +55,11 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 string output=Path.GetFullPath(match.Rule.Output);
                 if(!directories.Add(output)) continue;
                 string recordId=Constants.Hash(incoming.Id+"|"+output.ToLowerInvariant());
-                if(store.HasArchive(recordId)) continue;
+                if(!reexport && store.HasArchive(recordId)) continue;
                 var record=await ArchiveAsync(account,incoming,message,match.Rule,recordId,token);
                 store.Archive(record);
-                if(match.Rule.DetectAnomaly) CheckAnomaly(incoming,message,record.Directory,account.Address,log);
+                if(!reexport&&match.Rule.DetectAnomaly) CheckAnomaly(incoming,message,record.Directory,account.Address,log);
+                if(AttachmentExport.CloudLinks(message).Count>0)log("异常：邮件包含云附件链接，文件本身不在邮件中；请查看导出目录中的云附件下载链接.txt。");
                 log(account.Address+"：已保存至 "+record.Directory);
             }
         }
@@ -89,7 +91,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 log("异常：达到全局回复限额，未发送，请管理员查看记录。");
             }
         }
-        store.Mark(incoming.Id,valid?"Archived":"Invalid",from,account.Address);
+        if(!reexport)store.Mark(incoming.Id,valid?"Archived":"Invalid",from,account.Address);
         return true;
     }
 
@@ -99,17 +101,17 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         value=new string(value.Select(c=>invalid.Contains(c)||char.IsControl(c)?'_':c).ToArray()).Trim(' ','.');
         return string.IsNullOrEmpty(value)?"attachment.bin":value[..Math.Min(value.Length,90)];
     }
-    private static async Task<ArchiveRecord> ArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string recordId,CancellationToken token)
+    public static async Task<ArchiveRecord> ArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string recordId,CancellationToken token)
     {
         string parent=Path.GetFullPath(rule.Output); Directory.CreateDirectory(parent);
-        string final=Path.Combine(parent,incoming.Id[..24]);
+        string final=Path.Combine(parent,SafeName(incoming.Subject)+"_"+(incoming.ReceivedAt??message.Date).ToLocalTime().ToString("yyyyMMdd-HHmmss")+"_"+incoming.Id[..8]);
         string staging=Path.Combine(parent,"."+incoming.Id[..24]+"-"+Guid.NewGuid().ToString("N")+".partial");
         Directory.CreateDirectory(staging);
         await message.WriteToAsync(Path.Combine(staging,"original.eml"),token);
         await File.WriteAllTextAsync(Path.Combine(staging,"body.txt"),message.TextBody??"",token);
         if(message.HtmlBody is { } html) await File.WriteAllTextAsync(Path.Combine(staging,"body.html"),html,token);
         var files=new List<string>(); int index=0;
-        foreach(var attachment in message.Attachments)
+        foreach(var attachment in AttachmentExport.Parts(message))
         {
             string name=$"attachment_{++index:000}_"+SafeName(attachment.ContentDisposition?.FileName??attachment.ContentType.Name??"attachment.bin");
             await using var stream=File.Create(Path.Combine(staging,name));
@@ -117,8 +119,11 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
             else if(attachment is MimePart { Content: not null } part) await part.Content.DecodeToAsync(stream,token);
             files.Add(Path.Combine(final,name));
         }
+        var links=AttachmentExport.CloudLinks(message);
+        if(links.Count>0)await File.WriteAllLinesAsync(Path.Combine(staging,"云附件下载链接.txt"),new[]{"此邮件包含云附件。文件本身不在 EML 中，尚未下载。请在浏览器中打开以下链接；可能需要登录或链接已过期。"}.Concat(links),token);
+        if(files.Count==0)await File.WriteAllTextAsync(Path.Combine(staging,"附件说明.txt"),links.Count>0?"本邮件没有随信文件附件，但包含云附件链接，请查看云附件下载链接.txt。":"本邮件未检测到随信文件附件。若邮箱界面显示下载入口，可能是在线链接，请查看正文或原始邮件。",token);
         // Never overwrite an existing incomplete or manually edited directory.
-        if(Directory.Exists(final)) final+="-"+DateTime.Now.ToString("yyyyMMddHHmmssfff");
+        if(Directory.Exists(final)) final+="-重新导出-"+Guid.NewGuid().ToString("N")[..8];
         files=files.Select(f=>Path.Combine(final,Path.GetFileName(f))).ToList();
         var record=new ArchiveRecord(recordId,account.Address,incoming.Sender,incoming.Subject,rule.Name,final,incoming.ReceivedAt,message.Date,DateTimeOffset.UtcNow,message.MessageId??"",files);
         await File.WriteAllTextAsync(Path.Combine(staging,"metadata.json"),JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true}),token);
@@ -129,7 +134,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         string text=message.TextBody??Regex.Replace(message.HtmlBody??"","<[^>]+>"," ");
         text=Regex.Replace(text,"\\s+"," ").Trim(); text=text[..Math.Min(text.Length,20000)];
         var hashes=new List<string>();
-        foreach(var attachment in message.Attachments)
+        foreach(var attachment in AttachmentExport.Parts(message))
         {
             using var stream=new MemoryStream();
             if(attachment is MimePart { Content: not null } part) part.Content.DecodeTo(stream);
