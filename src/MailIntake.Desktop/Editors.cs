@@ -84,9 +84,10 @@ internal sealed class AccountEditor : EditorForm
 internal sealed class RuleEditor : EditorForm
 {
     public MailRule Result{get;private set;}
-    public RuleEditor(MailRule? old=null):base(old is null?"新增规则 · 关键词与目录成组保存":"编辑规则")
+    public RuleEditor(MailRule? old=null,bool fromTemplate=false):base(fromTemplate?"从模板新增规则":old is null?"新增规则 · 关键词与目录成组保存":"编辑规则")
     {
         Result=old??new();var source=Result;Height=820;
+        if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Text="下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和固定开头，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。"});
         var name=TextField("规则名称",source.Name);
         var mode=Choice("模式",source.Mode,"结构校验","关键词");
         var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords));
@@ -121,5 +122,8 @@ internal sealed class RuleEditor : EditorForm
             KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule);MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});
+        var saveTemplate=new Button{Text="保存为模板",Width=130,Height=34};
+        saveTemplate.Click+=(_,_)=>{try{TemplateFiles.Save(this,Read());}catch(Exception e){MessageBox.Show(this,e.Message,"模板保存未完成");}};
+        Footer.Controls.Add(saveTemplate);
     }
 }

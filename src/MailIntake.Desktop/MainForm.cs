@@ -37,7 +37,7 @@ internal sealed class MainForm : Form
         var setup=new TabPage("邮箱与规则"){Padding=new Padding(12)};
         var split=new SplitContainer{Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=220};
         split.Panel1.Controls.Add(accounts);split.Panel1.Controls.Add(Toolbar(("绑定邮箱",AddAccount),("编辑",EditAccount),("移除",RemoveAccount),("测试连接（不发信）",TestAccount),("导入旧版配置",ImportLegacy)));
-        split.Panel2.Controls.Add(rules);split.Panel2.Controls.Add(Toolbar(("新增规则",AddRule),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder)));
+        split.Panel2.Controls.Add(rules);split.Panel2.Controls.Add(Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder)));
         setup.Controls.Add(split);tabs.TabPages.Add(setup);
         AddPage(tabs,"归档记录",archives,Toolbar(("刷新",RefreshRecords),("打开选中目录",OpenArchive),("导出 CSV",()=>ExportGrid(archives,"归档记录"))));
         AddPage(tabs,"回复记录",replies,Toolbar(("刷新",RefreshRecords),("导出 CSV",()=>ExportGrid(replies,"回复记录"))));
@@ -83,6 +83,15 @@ internal sealed class MainForm : Form
     private void CheckDuplicate(MailAccount a,int except){if(settings.Accounts.Where((_,i)=>i!=except).Any(x=>x.Address.Equals(a.Address,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("该邮箱已绑定。");}
     private void RemoveAccount(){if(SelectedAccount is null)return;settings.Accounts.RemoveAt(AccountIndex);RefreshAccounts();}
     private void AddRule(){if(SelectedAccount is not {} a){MessageBox.Show(this,"请先绑定并选中邮箱。");return;}using var form=new RuleEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;a.Rules.Add(form.Result);RefreshRules();}
+    private void SaveRuleTemplate(){if(SelectedRule is not {} rule){MessageBox.Show(this,"请先选中一条规则。");return;}TemplateFiles.Save(this,rule);}
+    private void AddFromTemplate()
+    {
+        if(SelectedAccount is not {} account){MessageBox.Show(this,"请先绑定并选中邮箱。");return;}
+        var rule=TemplateFiles.Load(this);if(rule is null)return;
+        using var editor=new RuleEditor(rule,true);
+        if(editor.ShowDialog(this)!=DialogResult.OK)return;
+        account.Rules.Add(editor.Result);RefreshRules();Log("已从模板创建独立规则，请点击“保存并开始”应用。原模板保持不变。");
+    }
     private void EditRule(){if(SelectedAccount is not {} a||SelectedRule is not {} r)return;int i=RuleIndex;using var form=new RuleEditor(r);if(form.ShowDialog(this)!=DialogResult.OK)return;a.Rules[i]=form.Result;RefreshRules();}
     private void RemoveRule(){if(SelectedAccount is not {} a||SelectedRule is null)return;a.Rules.RemoveAt(RuleIndex);RefreshRules();}
     private void MoveRule(){if(SelectedAccount is not {} a||RuleIndex<1)return;int i=RuleIndex;(a.Rules[i-1],a.Rules[i])=(a.Rules[i],a.Rules[i-1]);RefreshRules();rules.CurrentCell=rules.Rows[i-1].Cells[0];}

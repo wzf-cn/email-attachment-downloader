@@ -62,6 +62,19 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("rule templates preserve reusable settings and create independent task rules",()=>
+        {
+            var f=new Fixture();f.Rule.FlatAttachments=true;f.Rule.DownloadBody=false;f.Rule.MaxAttachmentMb=7;f.Rule.SubjectKey="private-test-key";
+            string path=Path.Combine(f.Root,"template.mailrule.json");RuleTemplates.Save(path,f.Rule);
+            string saved=File.ReadAllText(path);Eq(false,saved.Contains("private-test-key"));Eq(false,saved.Contains("00123"));
+            var a=RuleTemplates.Load(path);var b=RuleTemplates.Load(path);
+            Eq(false,a.Id==b.Id);Eq(false,a.Id==f.Rule.Id);Eq(0,a.Roster.Count);Eq("",a.Output);Eq("",a.SubjectKey);
+            Eq(true,a.FlatAttachments);Eq(false,a.DownloadBody);Eq(7,a.MaxAttachmentMb);Eq(f.Rule.Prefix,a.Prefix);
+            a.Keywords.Clear();Eq(true,b.Keywords.Count>0);Eq(true,f.Rule.Keywords.Count>0);Eq(1,f.Rule.Roster.Count);
+            Eq(saved,File.ReadAllText(path));
+            a.Output=Path.Combine(f.Root,"new-task");a.Roster=new(){{"777","李四"}};RuleValidator.Check(a);
+            Eq(Validation.Success,RuleValidator.Match("工程实践-李四-777",a));return Task.CompletedTask;
+        });
         await Test("shared attachment folder keeps same names distinct and records their paths",async()=>
         {
             var f=new Fixture();f.Rule.FlatAttachments=true;
