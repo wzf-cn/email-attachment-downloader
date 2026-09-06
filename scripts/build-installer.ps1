@@ -1,4 +1,4 @@
-param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage, [string]$Version='1.0.2')
+param([string]$MakeNsis = "$env:LOCALAPPDATA\MailIntakeBuild\nsis-3.12\makensis.exe", [switch]$TestPackage, [string]$Version='1.0.3')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $releaseRoot = Join-Path $projectRoot 'artifacts\win-x64'

@@ -18,11 +18,24 @@ SetCompressor /SOLID zlib
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "立即运行邮件接收管理"
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApplication"
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "SimpChinese"
 Var AppLock
+
+Function LaunchApplication
+  ; The app must be able to create its single-instance mutex before launch.
+  ${If} $AppLock != 0
+    System::Call 'kernel32::ReleaseMutex(p $AppLock)'
+    System::Call 'kernel32::CloseHandle(p $AppLock)'
+    StrCpy $AppLock 0
+  ${EndIf}
+  ExecShell "open" "$INSTDIR\MailIntake.exe"
+FunctionEnd
 
 !macro StopApp Prefix
 Function ${Prefix}StopApp
