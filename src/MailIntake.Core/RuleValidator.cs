@@ -31,6 +31,7 @@ public static class RuleValidator
 
     public static void Check(MailRule rule)
     {
+        if(rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)throw new ArgumentException("单个附件上限必须为 1 到 500 MB。");
         if (string.IsNullOrWhiteSpace(rule.Name)) throw new ArgumentException("请填写规则名称。");
         if (string.IsNullOrWhiteSpace(rule.Output) || !Path.IsPathFullyQualified(rule.Output)) throw new ArgumentException("请为此组规则选择完整下载目录。");
         if (rule.Mode == "关键词")

@@ -104,6 +104,8 @@ internal sealed class RuleEditor : EditorForm
         var browse=Field("",new Button{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
         var downloadBody=Field("下载内容",new CheckBox{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
         var downloadAttachments=Field("",new CheckBox{Text="下载附件（含云附件链接说明）",Checked=source.DownloadAttachments});
+        var attachmentLimit=Number("单个附件上限（MB）",source.MaxAttachmentMb,1,500);
+        Field("超限处理",new Label{AutoSize=true,Text="默认 20 MB；超过时仅记录文件名、大小和原因，不导出该文件，也不保存包含它的完整 EML。其他附件照常导出。当前需接收邮件后判断附件大小；若要避免接收整封大邮件，请同时设置主界面的邮件上限。"});
         var saveOriginal=Field("",new CheckBox{Text="保存原始邮件 EML（包含完整正文和随信附件）",Checked=source.SaveOriginal});
         Field("保存说明",new Label{AutoSize=true,Text="三项可独立选择；全部取消时仅保存发件人、时间等记录。若不想保存正文或附件的任何副本，也请取消原始邮件 EML。修改后需重新导出才能应用到历史邮件。"});
         var replies=Field("自动回复",new CheckBox{Text="完整匹配时回复；错误主题按统一策略回复",Checked=source.ReplyEnabled});
@@ -114,7 +116,7 @@ internal sealed class RuleEditor : EditorForm
         var test=Field("",new Button{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
         MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,Prefix=prefix.Text,Separator=separator.Text,Fields=Split(fields.Text),
-            KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,SaveOriginal=saveOriginal.Checked,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+            KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule);MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});
     }

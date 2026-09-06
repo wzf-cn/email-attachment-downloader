@@ -6,6 +6,23 @@ namespace MailIntake.Core;
 
 public static class AttachmentExport
 {
+    public static async Task<long> Size(MimeEntity part,CancellationToken token)
+    {
+        using var sink=new SizeStream();
+        if(part is MessagePart {Message:not null} embedded)await embedded.Message.WriteToAsync(sink,token);
+        else if(part is MimePart {Content:not null} file)await file.Content.DecodeToAsync(sink,token);
+        return sink.Count;
+    }
+    private sealed class SizeStream : Stream
+    {
+        public long Count;
+        public override bool CanRead=>false;public override bool CanSeek=>false;public override bool CanWrite=>true;
+        public override long Length=>Count;public override long Position{get=>Count;set=>throw new NotSupportedException();}
+        public override void Flush(){}public override int Read(byte[] b,int o,int c)=>throw new NotSupportedException();
+        public override long Seek(long o,SeekOrigin s)=>throw new NotSupportedException();public override void SetLength(long n)=>throw new NotSupportedException();
+        public override void Write(byte[] b,int o,int c)=>Count+=c;
+        public override void Write(ReadOnlySpan<byte> b)=>Count+=b.Length;
+    }
     public static IEnumerable<MimeEntity> Parts(MimeMessage message)=>Walk(message.Body);
     private static IEnumerable<MimeEntity> Walk(MimeEntity? entity)
     {

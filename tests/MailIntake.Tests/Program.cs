@@ -62,6 +62,14 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("attachment limit keeps exact boundary skips larger file and original EML",async()=>
+        {
+            var f=new Fixture();f.Rule.MaxAttachmentMb=1;var m=f.Mail("size-limit");
+            var builder=new BodyBuilder{TextBody="正文保留"};builder.Attachments.Add("刚好上限.bin",new byte[1024*1024]);builder.Attachments.Add("超过上限.bin",new byte[1024*1024+1]);m.Header.Body=builder.ToMessageBody();
+            await f.Process(m);var r=f.Store.Archives().Single();Eq(1,r.Attachments.Count);Eq(1,r.SkippedAttachments.Count);Eq(1024L*1024+1,r.SkippedAttachments[0].SizeBytes);
+            Eq(false,File.Exists(Path.Combine(r.Directory,"original.eml")));Eq(true,File.Exists(Path.Combine(r.Directory,"body.txt")));Eq(true,File.Exists(Path.Combine(r.Directory,"附件跳过记录.json")));Eq(true,f.Sender.Sent.Single().Body.Contains("未保存"));
+            Eq(1,Directory.GetFiles(r.Directory,"attachment_*").Length);
+        });
         await Test("all export option combinations and legacy defaults",async()=>
         {
             var legacy=System.Text.Json.JsonSerializer.Deserialize<MailRule>("{}")!;

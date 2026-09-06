@@ -54,6 +54,7 @@ public sealed class MailRule
     public bool DownloadBody { get; set; } = true;
     public bool DownloadAttachments { get; set; } = true;
     public bool SaveOriginal { get; set; } = true;
+    public int MaxAttachmentMb { get; set; } = 20;
     public bool ReplyEnabled { get; set; } = true;
     public string SuccessReply { get; set; } = "已收到，正文及附件已保存。";
     public bool DetectAnomaly { get; set; } = true;
@@ -65,7 +66,11 @@ public sealed record Incoming(string Id, string Subject, string Sender, DateTime
     long Size, MimeMessage Header, Func<CancellationToken,Task<MimeMessage>> Load);
 public sealed record ArchiveRecord(string Id, string Account, string Sender, string Subject,
     string Rule, string Directory, DateTimeOffset? ReceivedAt, DateTimeOffset SentAt,
-    DateTimeOffset SavedAt, string MessageId, List<string> Attachments);
+    DateTimeOffset SavedAt, string MessageId, List<string> Attachments)
+{
+    public List<SkippedAttachment> SkippedAttachments { get; init; } = [];
+}
+public sealed record SkippedAttachment(string Name,long SizeBytes,string Reason);
 public sealed record SenderState(string Sender, int Errors, bool Blocked, string UpdatedAt);
 public sealed record EventRecord(long Id, string Time, string Kind, string Sender, string Account, string Detail);
 public sealed record ReplyRecord(string Id,string Status,string Sender,string Account,string Kind,string MessageId,string Time);

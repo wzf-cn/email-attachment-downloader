@@ -34,6 +34,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         if(reexport&&!valid)return false;
         bool canReply=!reexport&&CanReply(incoming,settings.Accounts.Select(a=>a.Address.ToLowerInvariant()).ToHashSet());
         bool justBlocked=false;
+        bool skippedLarge=false;
         if(!valid)
         {
             if(canReply) justBlocked=store.RegisterError(incoming.Id,from,account.Address,selected.Result.ToString());
@@ -62,8 +63,10 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 effective.DownloadBody=same.Any(r=>r.DownloadBody);
                 effective.DownloadAttachments=same.Any(r=>r.DownloadAttachments);
                 effective.SaveOriginal=same.Any(r=>r.SaveOriginal);
+                effective.MaxAttachmentMb=same.Min(r=>r.MaxAttachmentMb);
                 var record=await ArchiveAsync(account,incoming,message,effective,recordId,token);
                 store.Archive(record);
+                if(record.SkippedAttachments.Count>0){skippedLarge=true;store.Event("附件超过上限",from,account.Address,record.Directory+"："+record.SkippedAttachments.Count+" 个附件未保存，请查看附件跳过记录.json。");log("异常：附件超过大小上限，仅记录，未保存超限文件及完整 EML。");}
                 if(effective.DownloadAttachments&&AttachmentExport.CloudLinks(message).Count>0)
                 {
                     try{CloudAttachmentSummary.Write(output);}
@@ -78,6 +81,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         if(canReply && (justBlocked || selected.Rule.ReplyEnabled))
         {
             string body=justBlocked?Constants.BlockReply:valid?selected.Rule.SuccessReply:Constants.ErrorReply;
+            if(valid&&skippedLarge)body="邮件已收到，但有附件超过接收大小上限，未保存这些附件。请缩小附件后重新提交，或联系管理员。";
             string kind=justBlocked?"停收通知":valid?"成功回复":"统一错误回复";
             string messageId=MimeUtils.GenerateMessageId();
             string reserved=store.ReserveReply(incoming.Id,from,account.Address,kind,messageId,settings.MaxRepliesPerHour);
@@ -119,7 +123,16 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         string final=Path.Combine(parent,SafeName(incoming.Subject)+"_"+(incoming.ReceivedAt??message.Date).ToLocalTime().ToString("yyyyMMdd-HHmmss")+"_"+incoming.Id[..8]);
         string staging=Path.Combine(parent,"."+incoming.Id[..24]+"-"+Guid.NewGuid().ToString("N")+".partial");
         Directory.CreateDirectory(staging);
-        if(rule.SaveOriginal)await message.WriteToAsync(Path.Combine(staging,"original.eml"),token);
+        var parts=AttachmentExport.Parts(message).ToList();
+        var oversized=new Dictionary<MimeEntity,long>();
+        foreach(var part in parts)
+        {
+            long size=await AttachmentExport.Size(part,token);
+            if(size>Math.Max(1,rule.MaxAttachmentMb)*1024L*1024L)oversized[part]=size;
+        }
+        var skipped=oversized.Select(p=>new SkippedAttachment(p.Key.ContentDisposition?.FileName??p.Key.ContentType.Name??"未命名附件",p.Value,$"超过单个附件上限 {rule.MaxAttachmentMb} MB，未保存；完整 EML 同时跳过")).ToList();
+        if(rule.SaveOriginal&&skipped.Count==0)await message.WriteToAsync(Path.Combine(staging,"original.eml"),token);
+        if(skipped.Count>0)await File.WriteAllTextAsync(Path.Combine(staging,"附件跳过记录.json"),JsonSerializer.Serialize(skipped,new JsonSerializerOptions{WriteIndented=true,Encoder=System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping}),token);
         if(rule.DownloadBody)
         {
             await File.WriteAllTextAsync(Path.Combine(staging,"body.txt"),message.TextBody??"",token);
@@ -128,6 +141,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         var files=new List<string>(); int index=0;
         foreach(var attachment in rule.DownloadAttachments?AttachmentExport.Parts(message):[])
         {
+            if(oversized.ContainsKey(attachment))continue;
             string name=$"attachment_{++index:000}_"+SafeName(attachment.ContentDisposition?.FileName??attachment.ContentType.Name??"attachment.bin");
             await using var stream=File.Create(Path.Combine(staging,name));
             if(attachment is MessagePart { Message: not null } embedded) await embedded.Message.WriteToAsync(stream,token);
@@ -136,11 +150,11 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         }
         var links=rule.DownloadAttachments?AttachmentExport.CloudLinks(message):[];
         if(links.Count>0)await File.WriteAllLinesAsync(Path.Combine(staging,"云附件下载链接.txt"),new[]{"此邮件包含云附件。文件本身不在 EML 中，尚未下载。请在浏览器中打开以下链接；可能需要登录或链接已过期。"}.Concat(links),token);
-        if(rule.DownloadAttachments&&files.Count==0)await File.WriteAllTextAsync(Path.Combine(staging,"附件说明.txt"),links.Count>0?"本邮件没有随信文件附件，但包含云附件链接，请查看云附件下载链接.txt。":"本邮件未检测到随信文件附件。若邮箱界面显示下载入口，可能是在线链接，请查看正文或原始邮件。",token);
+        if(rule.DownloadAttachments&&files.Count==0)await File.WriteAllTextAsync(Path.Combine(staging,"附件说明.txt"),skipped.Count>0?"存在超过上限的附件，未保存。请查看附件跳过记录.json。":links.Count>0?"本邮件没有随信文件附件，但包含云附件链接，请查看云附件下载链接.txt。":"本邮件未检测到随信文件附件。若邮箱界面显示下载入口，可能是在线链接，请查看正文或原始邮件。",token);
         // Never overwrite an existing incomplete or manually edited directory.
         if(Directory.Exists(final)) final+="-重新导出-"+Guid.NewGuid().ToString("N")[..8];
         files=files.Select(f=>Path.Combine(final,Path.GetFileName(f))).ToList();
-        var record=new ArchiveRecord(recordId,account.Address,incoming.Sender,incoming.Subject,rule.Name,final,incoming.ReceivedAt,message.Date,DateTimeOffset.UtcNow,message.MessageId??"",files);
+        var record=new ArchiveRecord(recordId,account.Address,incoming.Sender,incoming.Subject,rule.Name,final,incoming.ReceivedAt,message.Date,DateTimeOffset.UtcNow,message.MessageId??"",files){SkippedAttachments=skipped};
         await File.WriteAllTextAsync(Path.Combine(staging,"metadata.json"),JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true}),token);
         Directory.Move(staging,final); return record;
     }
