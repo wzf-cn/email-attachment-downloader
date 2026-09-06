@@ -2,6 +2,7 @@ using MailIntake.Core;
 using MimeKit;
 using System.Text;
 
+if(args.Length==2&&args[0]=="--summarize-links"){CloudAttachmentSummary.Write(args[1]);Console.WriteLine("CLOUD_SUMMARY_OK");return;}
 if(args.Length==3&&args[0]=="--repair-export")
 {
     int count=0,attachments=0,cloud=0;
@@ -15,6 +16,7 @@ if(args.Length==3&&args[0]=="--repair-export")
         var record=await IntakeEngine.ArchiveAsync(new(){Address=old.Account},incoming,message,new(){Name=old.Rule,Output=args[2]},old.Id,CancellationToken.None);
         count++;attachments+=record.Attachments.Count;if(AttachmentExport.CloudLinks(message).Count>0)cloud++;
     }
+    CloudAttachmentSummary.Write(args[2]);
     Console.WriteLine($"LOCAL_EXPORT_OK messages={count} attachments={attachments} cloudLinkMessages={cloud}");return;
 }
 var suite=new Suite();await suite.Run();
@@ -94,6 +96,8 @@ sealed class Suite
             var f=new Fixture();var m=f.Mail("inline");
             m.Header.Body=new Multipart("mixed") {new TextPart("html"){Text="超大附件 <a href=\"https://wx.mail.qq.com/download?x=1&amp;y=2\">下载</a>"},new MimePart("application","pdf"){Content=new MimeContent(new MemoryStream(Encoding.UTF8.GetBytes("pdf-data"))),ContentDisposition=new ContentDisposition("inline"),FileName="报告.pdf"},new MimePart("application","octet-stream"){Content=new MimeContent(new MemoryStream([1,2,3]))}};
             await f.Process(m);var record=f.Store.Archives().Single();Eq(2,record.Attachments.Count);Eq(true,File.ReadAllText(Path.Combine(record.Directory,"云附件下载链接.txt")).Contains("x=1&y=2"));
+            string summary=Path.Combine(f.Rule.Output,"云附件汇总.csv");Eq(true,File.ReadAllText(summary).Contains("x=1&y=2"));
+            string before=File.ReadAllText(summary);CloudAttachmentSummary.Write(f.Rule.Output);Eq(before,File.ReadAllText(summary));
         });
         await Test("subject parsing and roster/name validation",()=>
         {

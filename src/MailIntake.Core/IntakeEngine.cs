@@ -64,6 +64,12 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 effective.SaveOriginal=same.Any(r=>r.SaveOriginal);
                 var record=await ArchiveAsync(account,incoming,message,effective,recordId,token);
                 store.Archive(record);
+                if(effective.DownloadAttachments&&AttachmentExport.CloudLinks(message).Count>0)
+                {
+                    try{CloudAttachmentSummary.Write(output);}
+                    catch(Exception e)when(e is IOException or UnauthorizedAccessException or JsonException)
+                    {store.Event("云附件汇总失败",from,account.Address,output+"："+e.GetType().Name);log("异常：云附件汇总更新失败，请关闭占用汇总表的程序后重新导出；单封邮件的链接已保留。");}
+                }
                 if(!reexport&&match.Rule.DetectAnomaly) CheckAnomaly(incoming,message,record.Directory,account.Address,log);
                 if(effective.DownloadAttachments&&AttachmentExport.CloudLinks(message).Count>0)log("异常：邮件包含云附件链接，文件本身不在邮件中；请查看导出目录中的云附件下载链接.txt。");
                 log(account.Address+"：已保存至 "+record.Directory);
