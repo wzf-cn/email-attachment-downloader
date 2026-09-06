@@ -60,6 +60,26 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("all export option combinations and legacy defaults",async()=>
+        {
+            var legacy=System.Text.Json.JsonSerializer.Deserialize<MailRule>("{}")!;
+            Eq(true,legacy.DownloadBody&&legacy.DownloadAttachments&&legacy.SaveOriginal);
+            for(int bits=0;bits<8;bits++)
+            {
+                var f=new Fixture();f.Rule.DownloadBody=(bits&1)!=0;f.Rule.DownloadAttachments=(bits&2)!=0;f.Rule.SaveOriginal=(bits&4)!=0;
+                var snapshot=f.Settings.Snapshot().Accounts[0].Rules[0];Eq(f.Rule.DownloadBody,snapshot.DownloadBody);Eq(f.Rule.DownloadAttachments,snapshot.DownloadAttachments);Eq(f.Rule.SaveOriginal,snapshot.SaveOriginal);
+                await f.Process(f.Mail("options",attach:true));var r=f.Store.Archives().Single();
+                Eq(f.Rule.DownloadBody,File.Exists(Path.Combine(r.Directory,"body.txt")));Eq(f.Rule.SaveOriginal,File.Exists(Path.Combine(r.Directory,"original.eml")));
+                Eq(f.Rule.DownloadAttachments?1:0,r.Attachments.Count);Eq(true,File.Exists(Path.Combine(r.Directory,"metadata.json")));
+            }
+        });
+        await Test("same directory combines rule export choices",async()=>
+        {
+            var f=new Fixture();f.Rule.DownloadBody=false;f.Rule.DownloadAttachments=true;f.Rule.SaveOriginal=false;
+            var other=System.Text.Json.JsonSerializer.Deserialize<MailRule>(System.Text.Json.JsonSerializer.Serialize(f.Rule))!;
+            other.Id=Guid.NewGuid().ToString();other.DownloadBody=true;other.DownloadAttachments=false;f.Account.Rules.Add(other);
+            await f.Process(f.Mail("union",attach:true));var r=f.Store.Archives().Single();Eq(1,r.Attachments.Count);Eq(true,File.Exists(Path.Combine(r.Directory,"body.txt")));Eq(false,File.Exists(Path.Combine(r.Directory,"original.eml")));
+        });
         await Test("re-export preserves previous files and never sends replies or counts errors",async()=>
         {
             var f=new Fixture();var m=f.Mail("reexport",attach:true);await f.Process(m);

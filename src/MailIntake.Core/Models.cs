@@ -51,6 +51,9 @@ public sealed class MailRule
     public string SubjectKey { get; set; } = "";
     public Dictionary<string,string> Roster { get; set; } = [];
     public string Output { get; set; } = "";
+    public bool DownloadBody { get; set; } = true;
+    public bool DownloadAttachments { get; set; } = true;
+    public bool SaveOriginal { get; set; } = true;
     public bool ReplyEnabled { get; set; } = true;
     public string SuccessReply { get; set; } = "已收到，正文及附件已保存。";
     public bool DetectAnomaly { get; set; } = true;
