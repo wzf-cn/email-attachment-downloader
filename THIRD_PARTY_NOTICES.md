@@ -9,5 +9,6 @@ This independent Windows application uses the following components. Upstream not
 - SQLite native engine — public domain, subject to the native package's accompanying notices — https://sqlite.org/copyright.html
 - BouncyCastle.Cryptography — MIT — https://github.com/bcgit/bc-csharp
 - Additional transitive .NET packages — license expressions and versions are recorded in packages.lock.json and their NuGet metadata.
+- Installer: NSIS 3.12, using zlib compression — zlib/libpng license (see `licenses/NSIS.txt`) — https://nsis.sourceforge.io/
 
 Full upstream license texts are included under `licenses/`. Self-contained runtime files also retain their distributed notices. Review package licenses again when upgrading dependencies.
