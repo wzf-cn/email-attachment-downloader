@@ -8,12 +8,16 @@
 
 Windows x64 发布包解压后运行 `MailIntake.exe`，无需安装 Python 或 .NET 运行时。保留解压目录中的所有文件。
 
-1. 点击 **绑定邮箱**，填写 IMAP/POP3 与 SMTP 地址、端口及邮箱授权码。QQ 默认 IMAP 993 / SMTP 465。
+1. 点击 **绑定邮箱**，填写 IMAP/POP3 与 SMTP 地址、端口及邮箱授权码。新建邮箱填写 QQ、163、126 地址并离开输入框后，自动填入对应 SMTP 默认值；收信参数需单独确认。
 2. 选中邮箱，点击 **新增规则**，为每组关键词或结构校验明确指定下载目录。
 3. 可先 **测试连接（不发信）**，然后确认开始日期与回复内容，点击 **保存并开始**。
 4. 勾选登录启动后，当前 Windows 用户登录时自动运行。关闭窗口会转到托盘；右键托盘或点击退出软件才能结束。
 
 授权码在本机界面输入。连接测试只验证接收与 SMTP 登录，不发送测试邮件。配置发生变更后，只有保存才会应用到后续轮次。
+
+SMTP 默认配置：QQ 为 `smtp.qq.com`，163 为 `smtp.163.com`，126 为 `smtp.126.com`，均使用端口 `465` 和 `SSL/TLS`。已有邮箱和手动修改的参数不会自动覆盖；可选择服务商后点击“应用所选 SMTP 默认值”，再保存。此操作仅设置发信参数。
+
+这些 SMTP 参数已对照 [Thunderbird ISPDB](https://github.com/thunderbird/autoconfig/tree/master/ispdb) 与 [Nodemailer](https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json) 一致；配置一致不代表已通过真实账户收发测试。
 
 ## 主题规则
 

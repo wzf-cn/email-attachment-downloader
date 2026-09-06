@@ -44,10 +44,31 @@ internal sealed class AccountEditor : EditorForm
         var folder=TextField("IMAP 文件夹",source.Folder);
         var smtp=TextField("SMTP 发信服务器",source.SmtpHost);var smtpPort=Number("SMTP 端口",source.SmtpPort,1,65535);
         var smtpSecurity=Choice("发信加密",source.SmtpSecurity,"SSL/TLS","STARTTLS");
+        var preset=Choice("SMTP 默认配置","自定义 / 保留现值","自定义 / 保留现值","QQ","163","126");
+        var applyPreset=Field("",new Button{Text="应用所选 SMTP 默认值",Height=32});
+        void ApplySmtp(string provider)
+        {
+            string? server=provider switch{"QQ"=>"smtp.qq.com","163"=>"smtp.163.com","126"=>"smtp.126.com",_=>null};
+            if(server is null)return;
+            smtp.Text=server;smtpPort.Value=465;smtpSecurity.SelectedItem="SSL/TLS";
+        }
+        applyPreset.Click+=(_,_)=>ApplySmtp(preset.Text);
+        var lastDefault=(Host:source.SmtpHost,Port:source.SmtpPort,Security:source.SmtpSecurity);
+        address.Leave+=(_,_)=>
+        {
+            string provider=address.Text.Trim().Split('@').Last().ToLowerInvariant() switch{"qq.com"=>"QQ","163.com"=>"163","126.com"=>"126",_=>"自定义 / 保留现值"};
+            preset.SelectedItem=provider;
+            // Existing accounts and manually changed settings are never silently overwritten.
+            if(old is null && (smtp.Text,(int)smtpPort.Value,smtpSecurity.Text)==lastDefault)
+            {
+                ApplySmtp(provider);
+                lastDefault=(smtp.Text,(int)smtpPort.Value,smtpSecurity.Text);
+            }
+        };
         var password=TextField("授权码（留空保留原值）","",true);
         var since=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.Since});
         var enabled=Field("启用",new CheckBox{Checked=source.Enabled,Text="启用此邮箱"});
-        Field("说明",new Label{AutoSize=true,Text="QQ 通常使用 IMAP 993 / SMTP 465。POP3 按邮件 Date 筛选，不支持邮箱文件夹。此版本使用授权码登录，未提供 OAuth 登录界面。"});
+        Field("说明",new Label{AutoSize=true,Text="QQ、163、126 的 SMTP 默认值为对应服务器 / 465 / SSL/TLS。新建邮箱填写地址后自动填入；已有配置可点击应用。收信参数请单独填写。POP3 按邮件 Date 筛选；此版本使用授权码登录。"});
         protocol.SelectedIndexChanged+=(_,_)=>{if(source.Host=="imap.qq.com"||source.Host=="pop.qq.com"){host.Text=protocol.Text=="POP3"?"pop.qq.com":"imap.qq.com";port.Value=protocol.Text=="POP3"?995:993;}};
         SaveButton(()=>
         {
