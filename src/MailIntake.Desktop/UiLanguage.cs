@@ -74,6 +74,8 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+检索主题、邮箱或规则|Search subject, email or rule
+清空检索|Clear search
 检查频率|Check frequency
 检查频率（分钟）|Check interval (minutes)
 检查频率必须为 1 到 1440 分钟。|Check interval must be between 1 and 1440 minutes.

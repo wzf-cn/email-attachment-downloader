@@ -15,6 +15,8 @@ internal sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer timer=new(){Interval=1000};
     private readonly NotifyIcon tray=new(){Icon=AppIcon.Value,Text="邮件接收管理",Visible=true};
     private readonly DataGridView accounts=Grid(), rules=Grid(), archives=Grid(), replies=Grid(), senders=Grid(), events=Grid();
+    private readonly TextBox archiveSearch=new(){Name="archiveSearch",Width=360};
+    private List<ArchiveRecord> archiveRecords=[];
     private readonly TextBox logs=new(){Multiline=true,ReadOnly=true,Dock=DockStyle.Fill,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,BorderStyle=BorderStyle.None};
     private readonly Label status=new(){Text="尚未开始 · 请先绑定邮箱并设置规则",AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Padding=new Padding(8)};
     private readonly RuleSchedule schedule=new();
@@ -65,7 +67,14 @@ internal sealed class MainForm : Form
         split.Panel1.Controls.Add(Design.Card("绑定邮箱 · 选中邮箱后管理其规则",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));
         split.Panel2.Controls.Add(Design.Card("收件规则 · 每组规则使用独立下载目录",rules,Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder))));
         tabs.AddPage("邮箱与规则",split);
-        AddPage(tabs,"归档记录",archives,Toolbar(("刷新",RefreshRecords),("打开选中目录",OpenArchive),("导出 CSV",()=>ExportGrid(archives,"归档记录"))));
+        var archivePanel=new Panel{Dock=DockStyle.Fill};
+        var searchRow=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,Padding=new Padding(0,4,0,8)};
+        searchRow.Controls.Add(new Label{Text="检索主题、邮箱或规则",AutoSize=true,Margin=new Padding(0,7,12,0)});
+        archiveSearch.Margin=new Padding(0,4,12,0);searchRow.Controls.Add(archiveSearch);
+        var clearSearch=new ActionButton{Text="清空检索",Width=120};clearSearch.Click+=(_,_)=>{archiveSearch.Clear();archiveSearch.Focus();};searchRow.Controls.Add(clearSearch);
+        archiveSearch.TextChanged+=(_,_)=>FilterArchives();
+        archivePanel.Controls.Add(archives);archivePanel.Controls.Add(searchRow);
+        AddPage(tabs,"归档记录",archivePanel,Toolbar(("刷新",RefreshRecords),("打开选中目录",OpenArchive),("导出 CSV",()=>ExportGrid(archives,"归档记录"))));
         AddPage(tabs,"回复记录",replies,Toolbar(("刷新",RefreshRecords),("导出 CSV",()=>ExportGrid(replies,"回复记录"))));
         AddPage(tabs,"停收管理",senders,Toolbar(("刷新",RefreshRecords),("重置并恢复接收",ResetSender)));
         AddPage(tabs,"异常与审计",events,Toolbar(("刷新",RefreshRecords),("查看详情",ShowEvent),("导出 CSV",()=>ExportGrid(events,"异常记录"))));
@@ -206,9 +215,15 @@ internal sealed class MainForm : Form
             cycleAnomalies=0;
         }
     }
+    private void FilterArchives()
+    {
+        string query=archiveSearch.Text.Trim();
+        var matches=archiveRecords.Where(a=>query.Length==0||new[]{a.Subject,a.Sender,a.Account,a.Rule}.Any(value=>value.Contains(query,StringComparison.OrdinalIgnoreCase)));
+        archives.DataSource=matches.Select(a=>new{收件邮箱=a.Account,发件邮箱=a.Sender,主题=a.Subject,规则=a.Rule,接收时间=a.ReceivedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")??"未披露（POP3）",保存时间=a.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),目录=a.Directory}).ToList();
+    }
     private void RefreshRecords()
     {
-        archives.DataSource=store.Archives().Select(a=>new{收件邮箱=a.Account,发件邮箱=a.Sender,主题=a.Subject,规则=a.Rule,接收时间=a.ReceivedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")??"未披露（POP3）",保存时间=a.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),目录=a.Directory}).ToList();
+        archiveRecords=store.Archives();FilterArchives();
         replies.DataSource=store.Replies().Select(r=>new{时间=r.Time,收件邮箱=r.Account,发件邮箱=r.Sender,类型=r.Kind,状态=r.Status switch{"Sent"=>"服务器已接受","Sending"=>"发送中或中断待核实","Uncertain"=>"结果不确定","RateLimited"=>"达到回复限额",_=>r.Status}}).ToList();
         senders.DataSource=store.Senders().Select(s=>new{发件邮箱=s.Sender,连续错误次数=s.Errors,接收状态=s.Blocked?"已停收":"正常",更新时间=s.UpdatedAt}).ToList();
         events.DataSource=store.Events().Select(e=>new{时间=e.Time,类型=e.Kind,发件邮箱=e.Sender,收件邮箱=e.Account,详情=e.Detail}).ToList();
