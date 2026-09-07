@@ -131,7 +131,7 @@ internal sealed class MainForm : Form
         accounts.DataSource=settings.Accounts.Select(a=>new{邮箱=a.Address,协议=a.Protocol,服务器=a.Host,状态=a.Enabled?"启用":"停用",规则数=a.Rules.Count}).ToList();
         if(accounts.Rows.Count>0)accounts.CurrentCell=accounts.Rows[Math.Clamp(selected,0,accounts.Rows.Count-1)].Cells[0];RefreshRules();
     }
-    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,模式=r.Mode,检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
+    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
     private void AddAccount(){using var form=new AccountEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,-1);settings.Accounts.Add(form.Result);RefreshAccounts(settings.Accounts.Count-1);}
     private void EditAccount(){if(SelectedAccount is not {} a)return;int i=AccountIndex;using var form=new AccountEditor(a);if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,i);settings.Accounts[i]=form.Result;RefreshAccounts(i);}
     private void CheckDuplicate(MailAccount a,int except){if(settings.Accounts.Where((_,i)=>i!=except).Any(x=>x.Address.Equals(a.Address,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("该邮箱已绑定。");}

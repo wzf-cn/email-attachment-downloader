@@ -112,37 +112,16 @@ internal sealed class RuleEditor : EditorForm
     {
         Result=old??new();var source=Result;Height=840;
 
-        var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
-        if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Text="下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和检查频率，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。"});
-
         var name=TextField("规则名称",source.Name);
-        var mode=Choice("模式",source.Mode,"结构校验","关键词");
         var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords.Count>0?source.Keywords:string.IsNullOrWhiteSpace(source.Prefix)?[]:[source.Prefix]));
         var searchSubject=new CheckBox{Text="检索主题",AutoSize=true,Checked=source.SearchSubject};
         var searchBody=new CheckBox{Text="检索正文",AutoSize=true,Checked=source.SearchBody};
         var searchAttachments=new CheckBox{Text="检索附件名",AutoSize=true,Checked=source.SearchAttachmentNames};
         var scopes=new FlowLayoutPanel{AutoSize=true};scopes.Controls.AddRange([searchSubject,searchBody,searchAttachments]);Field("检索范围",scopes);
+        var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
+        if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,Text="请核对规则名称、关键词、检查频率及回复内容，并选择本组下载目录。"});
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
-        var separator=TextField("字段分隔符",source.Separator);
-        var fields=TextField("主题包含哪些项目",string.Join(',',source.Fields));
-        Field("填写示例",new Label{AutoSize=true,Text="填“姓名”表示发件人须在主题中写自己的姓名。例如：工程实践-张三-00123。若还要求班级，填“姓名,班级”。学号在下方“结尾校验”中设置。"});
-        var keyMode=Choice("结尾校验",source.KeyMode,"名单","固定秘钥");
-        var subjectKey=TextField("固定秘钥",source.SubjectKey,true);
-        var roster=new Dictionary<string,string>(source.Roster);
-        var rosterButton=Field("批量名单",new ActionButton{Text=$"导入 CSV · 已有 {roster.Count} 条",Height=32});
-        rosterButton.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="学号名单 CSV|*.csv"};if(picker.ShowDialog(this)!=DialogResult.OK)return;try{var data=RuleValidator.ImportRoster(picker.FileName);roster=data;keyMode.Text="名单";rosterButton.Text=$"导入 CSV · 已有 {roster.Count} 条";}catch(Exception e){MessageBox.Show(this,e.Message,"导入失败");}};
-        var preview=Field("主题示例",new Label{AutoSize=true,ForeColor=Color.FromArgb(22,100,220)});
-        preview.Tag="keep-text";
-        void UpdateSubject()
-        {
-            bool structured=mode.Text=="结构校验";
-            foreach(var control in new Control[]{separator,fields,keyMode})control.Enabled=structured;
-            subjectKey.Enabled=structured&&keyMode.Text=="固定秘钥";rosterButton.Enabled=structured&&keyMode.Text=="名单";matchAll.Enabled=!structured;
-            preview.Text=structured?string.Join(separator.Text,new[]{"〈主题内容〉"}.Concat(fields.Text.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries).Select(x=>x.Trim()=="姓名"?"张三":"〈"+x.Trim()+"〉")).Append(keyMode.Text=="名单"?"00123":"〈秘钥〉")):"命中关键词即可处理，无需校验主题结构。";
-        }
-        mode.SelectedIndexChanged+=(_,_)=>UpdateSubject();keyMode.SelectedIndexChanged+=(_,_)=>UpdateSubject();
-        separator.TextChanged+=(_,_)=>UpdateSubject();fields.TextChanged+=(_,_)=>UpdateSubject();UpdateSubject();
         InlineHeading("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
@@ -155,18 +134,16 @@ internal sealed class RuleEditor : EditorForm
         var saveOriginal=Field("",new CheckBox{Text="保存原始邮件 EML（包含完整正文和随信附件）",Checked=source.SaveOriginal});
         Field("保存说明",new Label{AutoSize=true,Text="三项可独立选择；全部取消时仅保存发件人、时间等记录。若不想保存正文或附件的任何副本，也请取消原始邮件 EML。修改后需重新导出才能应用到历史邮件。"});
         InlineHeading("回复与安全");
-        var replies=Field("自动回复",new CheckBox{Text="完整匹配时回复；错误主题按统一策略回复",Checked=source.ReplyEnabled});
+        var replies=Field("自动回复",new CheckBox{Text="关键词匹配成功后回复",Checked=source.ReplyEnabled});
         var success=TextField("完整匹配回复正文",source.SuccessReply,false,3);
         var detect=Field("异常检查",new CheckBox{Text="检查同主题、不同发件邮箱的正文与附件差异",Checked=source.DetectAnomaly});
-        Field("错误与停收策略",new Label{AutoSize=true,Text="错误统一回复："+Constants.ErrorReply+"。默认连续 3 次错误后通知联系管理员并停收；次数可在“运行设置”调整。完整主题校验成功后清零，已停收须管理员重置。"});
         InlineHeading("测试识别");
         var sample=TextField("测试主题（不发送邮件）","");
         var sampleBody=TextField("测试正文","",false,3);
         var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
-            KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         makeInstructions.Click+=(_,_)=>
         {
             try { using var dialog=new SubjectInstructionsForm(Read());dialog.ShowDialog(this); }

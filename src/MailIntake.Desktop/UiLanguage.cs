@@ -84,6 +84,8 @@ internal static class UiLanguage
 请先填写触发关键词。|Enter keywords first.
 关键词不能包含换行。|Keywords cannot contain line breaks.
 请填写主题项目和分隔符；关键词不要包含字段分隔符。|Set the required fields and separator. Keywords must not contain the field separator.
+关键词匹配成功后回复|Reply when keywords match
+请核对规则名称、关键词、检查频率及回复内容，并选择本组下载目录。|Review the rule name, keywords, interval and reply, then choose a download folder.
 发给提交者|For senders
 一键生成主题说明|Generate subject instructions
 主题填写说明|Subject instructions

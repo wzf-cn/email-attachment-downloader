@@ -33,7 +33,7 @@ internal static class Program
                 using var feedback=new FeedbackForm();feedback.Show(form);Capture(feedback,"feedback");feedback.Close();
                 using var stars=new SupportForm(false);stars.Show(form);Capture(stars,"stars");stars.Close();
                 using var sponsor=new SupportForm(true);sponsor.Show(form);Capture(sponsor,"sponsor");sponsor.Close();
-                using var instructions=new SubjectInstructionsForm(new MailIntake.Core.MailRule{Keywords=["工程实践"],Fields=["姓名"],KeyMode="名单"});instructions.Show(form);Capture(instructions,"instructions");instructions.Close();
+                using var instructions=new SubjectInstructionsForm(new MailIntake.Core.MailRule{Mode="关键词",Keywords=["工程实践","报告"]});instructions.Show(form);Capture(instructions,"instructions");instructions.Close();
                 using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);
                 Capture(rule,"rule0");rule.ScrollToEnd();Capture(rule,"rule-bottom");
                 rule.Size=rule.MinimumSize;rule.ScrollToEnd();Capture(rule,"rule-small");rule.Close();

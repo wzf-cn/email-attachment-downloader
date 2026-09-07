@@ -24,7 +24,14 @@ internal static class LocalSettings
                 if(accounts[a].TryGetProperty("Rules",out var rules))
                     for(int r=0;r<settings.Accounts[a].Rules.Count;r++)
                         if(!rules[r].TryGetProperty("IntervalMinutes",out _))settings.Accounts[a].Rules[r].IntervalMinutes=Math.Clamp(settings.IntervalMinutes,1,1440);
+        foreach(var account in settings.Accounts)
+            foreach(var rule in account.Rules)UseKeywords(rule);
         return settings;
+    }
+    private static void UseKeywords(MailRule rule)
+    {
+        rule.Mode="关键词";
+        if(rule.Keywords.Count==0&&!string.IsNullOrWhiteSpace(rule.Prefix))rule.Keywords=[rule.Prefix];
     }
     public static void Save(Settings settings)
     {
@@ -58,12 +65,12 @@ internal static class LocalSettings
             _=Decrypt(account.EncryptedPassword);
             if(old.TryGetProperty("rules",out var rules)) foreach(var r in rules.EnumerateArray())
             {
-                var rule=new MailRule{Name=S(r,"name","导入规则"),Mode=S(r,"mode","keywords")=="structured"?"结构校验":"关键词",Prefix=S(r,"prefix"),
+                var rule=new MailRule{Name=S(r,"name","导入规则"),Mode="关键词",Prefix=S(r,"prefix"),
                     Separator=S(r,"separator","-"),Fields=L(r,"fields"),Keywords=L(r,"keywords"),KeyMode=S(r,"key_mode","fixed")=="roster"?"名单":"固定秘钥",
                     SubjectKey=S(r,"subject_key"),Output=S(r,"output"),ReplyEnabled=B(r,"reply_enabled"),SuccessReply=S(r,"success_reply","已收到"),
                     MatchAll=B(r,"match_all",B(root,"match_all")),DetectAnomaly=B(r,"anomaly_enabled",true)};
                 if(r.TryGetProperty("roster",out var roster)) foreach(var entry in roster.EnumerateObject()) rule.Roster[entry.Name]=entry.Value.GetString()??"";
-                RuleValidator.Check(rule); account.Rules.Add(rule);
+                UseKeywords(rule); RuleValidator.Check(rule); account.Rules.Add(rule);
             }
             result.Add(account);
         }

@@ -53,6 +53,10 @@ internal static class SmokeChecks
         var store=new StateStore(LocalSettings.Database);
         var accounts=LocalSettings.ImportPython(configPath,store);
         if(accounts.Count!=1||accounts[0].Rules[0].Roster["20260001"]!="张三"||!store.IsBlocked("student@example.test")||!store.IsHandled("legacy-message"))throw new Exception("Legacy migration failed");
+        accounts[0].Rules[0].Mode="结构校验";
+        LocalSettings.Save(new Settings{Accounts=accounts});
+        var migrated=LocalSettings.Load().Accounts[0].Rules[0];
+        if(migrated.Mode!="关键词"||RuleValidator.Match("工程实践",migrated)!=Validation.Success)throw new Exception("Keyword-only migration failed");
         if(!before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(configPath))))throw new Exception("Legacy configuration was changed");
         LocalSettings.Save(new Settings{Accounts=accounts,RunOnLaunch=false});
         if(LocalSettings.Load().Accounts.Count!=1)throw new Exception("Configuration roundtrip failed");
