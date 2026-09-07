@@ -13,7 +13,7 @@ internal sealed class MainForm : Form
     private readonly StateStore store;
     private readonly MailGateway gateway=new(LocalSettings.Decrypt);
     private readonly System.Windows.Forms.Timer timer=new(){Interval=1000};
-    private readonly NotifyIcon tray=new(){Icon=SystemIcons.Information,Text="邮件接收管理",Visible=true};
+    private readonly NotifyIcon tray=new(){Icon=AppIcon.Value,Text="邮件接收管理",Visible=true};
     private readonly DataGridView accounts=Grid(), rules=Grid(), archives=Grid(), replies=Grid(), senders=Grid(), events=Grid();
     private readonly TextBox logs=new(){Multiline=true,ReadOnly=true,Dock=DockStyle.Fill,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,BorderStyle=BorderStyle.None};
     private readonly Label status=new(){Text="尚未开始 · 请先绑定邮箱并设置规则",AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Padding=new Padding(8)};

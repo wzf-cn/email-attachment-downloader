@@ -32,6 +32,7 @@ internal static class UiLanguage
     }
     public static void Apply(Control root)
     {
+        if(root is Form window)window.Icon=AppIcon.Value;
         if(root is PageDeck deck)deck.UpdateLanguageLayout(English);
         if(root is MainForm main)main.MinimumSize=new Size(English?1240:1100,760);
         if(root.Tag is not "keep-text"&&(root is Form or Label or ActionButton or CheckBox))

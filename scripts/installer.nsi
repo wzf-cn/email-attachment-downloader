@@ -17,6 +17,8 @@ InstallDir "$LOCALAPPDATA\Programs\${APPKEY}"
 InstallDirRegKey HKCU "Software\${APPKEY}" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID zlib
+!define MUI_ICON "${__FILEDIR__}\..\assets\branding\mail-intake.ico"
+!define MUI_UNICON "${__FILEDIR__}\..\assets\branding\mail-intake.ico"
 !define MUI_ABORTWARNING
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
