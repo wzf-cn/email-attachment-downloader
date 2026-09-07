@@ -4,6 +4,7 @@ namespace MailIntake.Core;
 
 public static class SubjectInstructions
 {
+    public static List<string> SuggestKeywords(string topic)=>topic.Replace('，',',').Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     public static string Generate(string topic,MailRule rule,bool english=false)
     {
         topic=topic.Trim();

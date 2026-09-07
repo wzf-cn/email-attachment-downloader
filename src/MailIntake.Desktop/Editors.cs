@@ -105,6 +105,12 @@ internal sealed class RuleEditor : EditorForm
     {
         Result=old??new();var source=Result;Height=840;
         Section("触发与主题");
+        var instructionTopic=TextField("本次邮件主题",source.InstructionTopic);
+        Field("主题填写示例",new Label{AutoSize=true,Text="例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。"});
+        var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
+        var suggestedKeywords=TextField("建议关键词","");suggestedKeywords.ReadOnly=true;
+        var adoptKeywords=Field("",new ActionButton{Text="采用建议关键词",Height=36,Enabled=false});
+        Field("建议说明",new Label{AutoSize=true,Text="生成后给出主题中的固定文字作为建议；关键词为空时自动填入，已有关键词不会覆盖。"});
         if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Text="下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和检查频率，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。"});
 
         var name=TextField("规则名称",source.Name);
@@ -125,9 +131,6 @@ internal sealed class RuleEditor : EditorForm
         var roster=new Dictionary<string,string>(source.Roster);
         var rosterButton=Field("批量名单",new ActionButton{Text=$"导入 CSV · 已有 {roster.Count} 条",Height=32});
         rosterButton.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="学号名单 CSV|*.csv"};if(picker.ShowDialog(this)!=DialogResult.OK)return;try{var data=RuleValidator.ImportRoster(picker.FileName);roster=data;keyMode.Text="名单";rosterButton.Text=$"导入 CSV · 已有 {roster.Count} 条";}catch(Exception e){MessageBox.Show(this,e.Message,"导入失败");}};
-        var instructionTopic=TextField("本次邮件主题",source.InstructionTopic);
-        Field("主题填写示例",new Label{AutoSize=true,Text="例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。"});
-        var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
         var preview=Field("主题示例",new Label{AutoSize=true,ForeColor=Color.FromArgb(22,100,220)});
         preview.Tag="keep-text";
         void UpdateSubject()
@@ -163,7 +166,22 @@ internal sealed class RuleEditor : EditorForm
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
         MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,InstructionTopic=instructionTopic.Text.Trim(),Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
             KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
-        makeInstructions.Click+=(_,_)=>{try{using var dialog=new SubjectInstructionsForm(instructionTopic.Text,Read());dialog.ShowDialog(this);}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
+        instructionTopic.TextChanged+=(_,_)=>{suggestedKeywords.Text="";adoptKeywords.Enabled=false;};
+        adoptKeywords.Click+=(_,_)=>keywords.Text=suggestedKeywords.Text;
+        makeInstructions.Click+=(_,_)=>
+        {
+            try
+            {
+                var suggestions=SubjectInstructions.SuggestKeywords(instructionTopic.Text);
+                suggestedKeywords.Text=string.Join(',',suggestions);adoptKeywords.Enabled=suggestions.Count>0;
+                var rule=Read();bool empty=rule.Keywords.Count==0;
+                if(empty)rule.Keywords=suggestions;
+                using var dialog=new SubjectInstructionsForm(instructionTopic.Text,rule);
+                if(empty)keywords.Text=suggestedKeywords.Text;
+                dialog.ShowDialog(this);
+            }
+            catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}
+        };
         test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule,sampleBody.Text,Split(sampleNames.Text));MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});
         var saveTemplate=new ActionButton{Text="保存为模板",Width=130,Height=38};

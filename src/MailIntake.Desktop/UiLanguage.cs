@@ -74,6 +74,10 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+建议关键词|Suggested keywords
+采用建议关键词|Use suggested keywords
+建议说明|About suggestions
+生成后给出主题中的固定文字作为建议；关键词为空时自动填入，已有关键词不会覆盖。|Use the topic's fixed text as keywords. Empty keywords are filled after generation; existing keywords are preserved.
 本次邮件主题|Submission topic
 主题填写示例|Example topic
 例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。|Example: Practice report. Name and ID placeholders are added automatically when required.
