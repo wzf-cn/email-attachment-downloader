@@ -37,7 +37,11 @@ internal sealed class MainForm : Form
         var header=new Panel{Dock=DockStyle.Top,Height=62,Padding=new Padding(24,4,16,4),BackColor=Color.White};
         var title=Design.Heading("邮件接收管理",14);title.Dock=DockStyle.Fill;header.Controls.Add(title);
         var feedback=new ActionButton{Text="意见反馈",Dock=DockStyle.Right,Width=106,BorderWidth=0};
-        feedback.Click+=(_,_)=>{using var form=new FeedbackForm();form.ShowDialog(this);};header.Controls.Add(feedback);title.BringToFront();
+        feedback.Click+=(_,_)=>{using var form=new FeedbackForm();form.ShowDialog(this);};header.Controls.Add(feedback);
+        var sponsor=new ActionButton{Text="赞助支持",Dock=DockStyle.Right,Width=106,BorderWidth=0};
+        sponsor.Click+=(_,_)=>{using var form=new SupportForm(true);form.ShowDialog(this);};header.Controls.Add(sponsor);
+        var star=new ActionButton{Text="点个 Star",Dock=DockStyle.Right,Width=112,BorderWidth=0};
+        star.Click+=(_,_)=>{using var form=new SupportForm(false);form.ShowDialog(this);};header.Controls.Add(star);title.BringToFront();
         var tabs=new PageDeck(true);navigation=tabs;
         var split=new SplitContainer{Size=new Size(1000,550),Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=230,Panel1MinSize=170,Panel2MinSize=180,SplitterWidth=12,BackColor=Design.Background};
         split.Panel1.Controls.Add(Design.Card("绑定邮箱 · 选中邮箱后管理其规则",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));

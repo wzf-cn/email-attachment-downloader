@@ -29,6 +29,8 @@ internal static class Program
                 using var account=new AccountEditor();account.Show(form);Capture(account,"account");
                 account.Sections!.SelectPage(1);Capture(account,"servers");account.Close();
                 using var feedback=new FeedbackForm();feedback.Show(form);Capture(feedback,"feedback");feedback.Close();
+                using var stars=new SupportForm(false);stars.Show(form);Capture(stars,"stars");stars.Close();
+                using var sponsor=new SupportForm(true);sponsor.Show(form);Capture(sponsor,"sponsor");sponsor.Close();
                 using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);
                 for(int i=0;i<rule.Sections!.PageCount;i++){rule.Sections.SelectPage(i);Capture(rule,"rule"+i);}
                 rule.Size=rule.MinimumSize;rule.Sections.SelectPage(1);Capture(rule,"rule-small");rule.Close();
