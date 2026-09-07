@@ -8,7 +8,7 @@ internal sealed class SupportForm : Form
     public SupportForm(bool sponsor)
     {
         Text=sponsor?"赞助支持":"点个 Star";
-        ClientSize=sponsor?new Size(790,720):new Size(520,300);MinimumSize=Size;
+        ClientSize=sponsor?new Size(790,560):new Size(520,300);MinimumSize=Size;
         StartPosition=FormStartPosition.CenterParent;Font=new Font("Microsoft YaHei UI",10);
         BackColor=Color.White;Padding=new Padding(24);ShowInTaskbar=false;
         var content=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true};
@@ -33,17 +33,22 @@ internal sealed class SupportForm : Form
             {
                 if(File.Exists(addressFile)&&Uri.TryCreate(File.ReadAllText(addressFile).Trim(),UriKind.Absolute,out var address)&&address.Scheme=="https"&&string.IsNullOrEmpty(address.UserInfo))
                 {AddLink(headingRow,address.Host.Equals("paypal.me",StringComparison.OrdinalIgnoreCase)?"PayPal 赞助":"打开打赏页面",address.AbsoluteUri);available=true;}
-                var codes=new FlowLayoutPanel{Width=720,Height=490,WrapContents=false,Margin=Padding.Empty};
+                var codes=new FlowLayoutPanel{Width=720,Height=346,WrapContents=false,Margin=Padding.Empty};
                 foreach(var (file,label) in new[]{("wechat.png","微信支付"),("alipay.jpg","支付宝")})
                 {
                     string imagePath=Path.Combine(folder,file);
                     if(!File.Exists(imagePath))continue;
-                    using var source=Image.FromFile(imagePath);
-                    var card=new FlowLayoutPanel{Width=350,Height=490,FlowDirection=FlowDirection.TopDown,WrapContents=false};
-                    card.Controls.Add(new Label{Text=label,Width=340,Height=28,TextAlign=ContentAlignment.MiddleCenter,ForeColor=Design.Ink});
-                    var picture=new PictureBox{Image=new Bitmap(source),SizeMode=PictureBoxSizeMode.Zoom,Width=340,Height=400,AccessibleName=label+"收款码"};
-                    picture.Disposed+=(_,_)=>picture.Image?.Dispose();card.Controls.Add(picture);
-                    AddLink(card,"查看"+label+"原图",imagePath);codes.Controls.Add(card);available=true;
+                    bool wechat=file=="wechat.png";
+                    var card=new Panel{Width=350,Height=340,Margin=new Padding(4,0,8,0),BackColor=Color.White};
+                    // Display only source regions. Never regenerate or alter the payment QR pixels.
+                    var qr=new ImageRegion(imagePath,wechat?new Rectangle(425,477,602,602):new Rectangle(250,582,552,552))
+                    {Location=new Point(40,0),Size=new Size(270,270),AccessibleName=label+"收款码",Cursor=Cursors.Hand};
+                    qr.Click+=(_,_)=>OpenLink(imagePath);card.Controls.Add(qr);
+                    var badge=new FlowLayoutPanel{Location=new Point(76,281),Size=new Size(220,38),WrapContents=false};
+                    badge.Controls.Add(new ImageRegion(imagePath,wechat?new Rectangle(290,1445,220,210):new Rectangle(305,85,145,145))
+                    {Size=new Size(30,30),Margin=new Padding(0,0,8,0)});
+                    badge.Controls.Add(new Label{Text=wechat?"微信支付":"支付宝支付",AutoSize=true,ForeColor=Design.Ink,Margin=new Padding(0,3,0,0)});
+                    card.Controls.Add(badge);codes.Controls.Add(card);available=true;
                 }
                 if(codes.Controls.Count>0)content.Controls.Add(codes);else codes.Dispose();
             }
@@ -59,9 +64,31 @@ internal sealed class SupportForm : Form
         var button=new ActionButton{Text=text,Width=174,Height=40};
         button.Click+=(_,_)=>
         {
-            try{Process.Start(new ProcessStartInfo(address){UseShellExecute=true});}
-            catch{MessageBox.Show(this,"无法打开浏览器，请稍后再试。\n"+address,"打开页面失败");}
+            OpenLink(address);
         };
         parent.Controls.Add(button);
+    }
+    private void OpenLink(string address)
+    {
+        try{Process.Start(new ProcessStartInfo(address){UseShellExecute=true});}
+        catch{MessageBox.Show(this,"无法打开，请稍后再试。\n"+address,"打开页面失败");}
+    }
+    private sealed class ImageRegion : Control
+    {
+        private readonly Image source;
+        private readonly Rectangle region;
+        public ImageRegion(string path,Rectangle region)
+        {
+            source=Image.FromFile(path);this.region=region;DoubleBuffered=true;BackColor=Color.White;
+            if(!new Rectangle(0,0,source.Width,source.Height).Contains(region)){source.Dispose();throw new ArgumentException("Unsupported payment image dimensions");}
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.InterpolationMode=System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+            e.Graphics.PixelOffsetMode=System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            e.Graphics.DrawImage(source,ClientRectangle,region,GraphicsUnit.Pixel);
+        }
+        protected override void Dispose(bool disposing){if(disposing)source.Dispose();base.Dispose(disposing);}
     }
 }

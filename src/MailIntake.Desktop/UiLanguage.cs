@@ -256,6 +256,7 @@ GitHub 点 Star|Star on GitHub
 Gitee 点 Star|Star on Gitee
 微信支付|WeChat Pay
 支付宝|Alipay
+支付宝支付|Alipay
 查看微信支付原图|Open WeChat QR image
 查看支付宝原图|Open Alipay QR image
 打开打赏页面|Open donation page
