@@ -14,8 +14,24 @@ internal sealed class ActionButton : AntdUI.Button
     protected override void OnMouseEnter(EventArgs e){UpdateHelp();base.OnMouseEnter(e);}
     private void UpdateHelp()
     {
-        string description=ButtonHelp.Describe(Text??"");
-        if(Text=="取消"&&FindForm() is FeedbackForm)description="关闭反馈窗口；未提交的填写内容会保留为本地草稿。";
+        string label=UiLanguage.Original(Text??"");
+        string description=ButtonHelp.Describe(label);
+        if(UiLanguage.English)description=label switch
+        {
+            "测试连接"=>"Test incoming and outgoing sign-in without sending email.",
+            "保存并开始"=>"Save settings and start checking messages, including matching mail since the start date.",
+            "应用收发默认参数"=>"Replace incoming and outgoing server settings with the selected provider defaults.",
+            "重置并恢复接收"=>"Clear this sender's error count and allow new messages again.",
+            "意见反馈"=>"Send feedback to the developer without including email settings or messages.",
+            "保存为模板"=>"Save reusable settings without the roster, secret key or download folder.",
+            "赞助支持"=>"View optional donation methods. All features remain available without donating.",
+            "点个 Star"=>"Choose GitHub or Gitee and star the project in your browser.",
+            "退出软件"=>"Finish the current operation and exit the application.",
+            "暂停"=>"Stop checking after the current operation.",
+            "中文 / EN"=>"Choose Simplified Chinese or English. Your selection is saved automatically.",
+            _=>UiLanguage.T(label)
+        };
+        if(label=="取消"&&FindForm() is FeedbackForm)description=UiLanguage.English?"Close feedback and keep your unsent draft locally.":"关闭反馈窗口；未提交的填写内容会保留为本地草稿。";
         help?.SetToolTip(this,description);AccessibleDescription=description;
     }
     protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)help.Dispose();}
@@ -33,6 +49,8 @@ internal static class ButtonHelp
         "运行日志"=>"查看收信、下载和连接过程的运行信息。",
         "运行设置"=>"设置检查间隔、大小上限、停收次数和开机启动。",
         "意见反馈"=>"向开发者提交问题或建议，无需邮箱或 Gitee 账号。",
+        "中文 / EN"=>"选择简体中文或 English，立即切换界面并记住选择。",
+        "应用收发默认参数"=>"按所选服务商替换收信和发信服务器、端口及加密方式。",
         "点个 Star"=>"选择 GitHub 或 Gitee，打开项目页面为开源项目点 Star。",
         "GitHub 点 Star"=>"在浏览器打开 GitHub 项目；登录后点击页面上的 Star。",
         "Gitee 点 Star"=>"在浏览器打开 Gitee 项目；登录后点击页面上的 Star。",
@@ -103,7 +121,8 @@ internal static class Design
                         "启用此邮箱"=>"启用后将按规则检查这个邮箱；取消勾选可暂停此邮箱。",
                         _=>"启用或关闭此选项。"
                     };
-                    tips.SetToolTip(control,hint);control.AccessibleDescription=hint;
+                    void UpdateTip(){string value=UiLanguage.English?UiLanguage.T(UiLanguage.Original(control.Text)):hint;tips.SetToolTip(control,value);control.AccessibleDescription=value;}
+                    UpdateTip();control.MouseEnter+=(_,_)=>UpdateTip();
                 }
                 Walk(control);
             }
@@ -154,5 +173,6 @@ internal sealed class PageDeck : Panel
         pages[index].Page.BringToFront();
     }
     public int PageCount=>pages.Count;
+    internal void UpdateLanguageLayout(bool english){if(navigation.Dock==DockStyle.Left)navigation.Width=english?208:176;}
 }
 

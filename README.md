@@ -26,16 +26,18 @@
 
 Windows x64 发布包解压后运行 `MailIntake.exe`，无需安装 Python 或 .NET 运行时。保留解压目录中的所有文件。
 
-1. 点击 **绑定邮箱**，填写 IMAP/POP3 与 SMTP 地址、端口及邮箱授权码。新建邮箱填写 QQ、163、126 地址并离开输入框后，自动填入对应 SMTP 默认值；收信参数需单独确认。
+1. 点击 **绑定邮箱**，输入完整邮箱地址后自动识别服务商并填入 IMAP/POP3、SMTP 的服务器、端口和加密方式。再填写授权码或应用专用密码；未知域名手动配置。
 2. 选中邮箱，点击 **新增规则**，为每组关键词或结构校验明确指定下载目录。
 3. 可先 **测试连接（不发信）**，然后确认开始日期与回复内容，点击 **保存并开始**。
 4. 勾选登录启动后，当前 Windows 用户登录时自动运行。关闭窗口会转到托盘；右键托盘或点击退出软件才能结束。
 
 授权码在本机界面输入。连接测试只验证接收与 SMTP 登录，不发送测试邮件。配置发生变更后，只有保存才会应用到后续轮次。
 
-SMTP 默认配置：QQ 为 `smtp.qq.com`，163 为 `smtp.163.com`，126 为 `smtp.126.com`，均使用端口 `465` 和 `SSL/TLS`。已有邮箱和手动修改的参数不会自动覆盖；可选择服务商后点击“应用所选 SMTP 默认值”，再保存。此操作仅设置发信参数。
+内置 QQ/Foxmail、163、126、Yeah、新浪（含 VIP）、阿里云个人邮箱、139、Gmail、Yahoo、Outlook 默认参数。已有邮箱和手动修改的参数不会自动覆盖；可选择服务商后点击“应用收发默认参数”主动替换。Outlook 要求 OAuth2，当前版本暂不能直接登录，界面会提示。
 
-这些 SMTP 参数已对照 [Thunderbird ISPDB](https://github.com/thunderbird/autoconfig/tree/master/ispdb) 与 [Nodemailer](https://github.com/nodemailer/nodemailer/blob/master/lib/well-known/services.json) 一致；配置一致不代表已通过真实账户收发测试。
+默认参数参考 [Thunderbird ISPDB](https://github.com/thunderbird/autoconfig/tree/master/ispdb)、[Nodemailer](https://nodemailer.com/smtp/well-known-services) 和服务商官方帮助；来源、差异与完整参数见 [邮箱默认配置](docs/MAIL_PROVIDERS.md)。配置核对不代表已通过真实账户收发测试。
+
+右上角可选择 **简体中文 / English**，立即切换界面并记住选择。语言设置保存在数据目录的 `language.txt`，不会改动账号、关键词、名单、自动回复正文或已下载文件；历史日志和原始审计内容保留原文。文件选择器等系统窗口由 Windows 的显示语言决定。
 
 ## 更新软件
 
@@ -145,7 +147,7 @@ dotnet run --project tests/MailIntake.Tests/MailIntake.Tests.csproj
 
 ## 交付边界
 
-当前版本为 1.2.3，提供安装包与便携版。已进行自动化业务测试和隔离界面检查，安装更新与卸载验证记录见 docs。尚未用真实 QQ 邮箱授权码完成收发验收，未验证机器重启后的登录启动。发布包未做数字签名，Windows 可能显示安全提醒。离线测试和界面检查不能替代真实邮箱兼容性验证。
+当前版本为 1.3.0，提供安装包与便携版。已进行自动化业务测试和隔离界面检查，安装更新与卸载验证记录见 docs。尚未用真实 QQ 邮箱授权码完成收发验收，未验证机器重启后的登录启动。发布包未做数字签名，Windows 可能显示安全提醒。离线测试和界面检查不能替代真实邮箱兼容性验证。
 
 源码仓库不包含用户邮箱配置、授权码、邮件、真实名单、反馈数据或服务器备份。问题反馈与贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题见 [SECURITY.md](SECURITY.md)。
 
@@ -168,3 +170,6 @@ dotnet run --project tests/MailIntake.Tests/MailIntake.Tests.csproj
 
 ### 1.2.3 支持项目
 顶部新增“点个 Star”和“赞助支持”。可选择 GitHub 或 Gitee 项目页；赞助窗口提供微信、支付宝收款码及查看原图入口。打赏自愿，不影响软件功能。
+
+### 1.3.0 中英文与邮箱自动配置
+新增界面语言切换及常见邮箱的完整收发参数识别。规则的内部值保持兼容；名单姓名校验同时识别字段名“姓名”和“Name”。自动默认值保留手动服务器设置。新增域名、协议切换和语言往返检查。

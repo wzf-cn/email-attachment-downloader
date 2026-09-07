@@ -28,6 +28,8 @@ internal sealed class MainForm : Form
     private int cycleAnomalies;
     private DateTime next=DateTime.MinValue;
     private readonly bool smoke;
+    private readonly ContextMenuStrip menuForLanguage=new();
+    protected override void OnShown(EventArgs e){base.OnShown(e);UiLanguage.Apply(this);}
     private readonly EventWaitHandle updateExit=new(false,EventResetMode.AutoReset,"Local\\MailIntakeUpdateExit");
     public MainForm(bool smoke=false)
     {
@@ -42,6 +44,14 @@ internal sealed class MainForm : Form
         sponsor.Click+=(_,_)=>{using var form=new SupportForm(true);form.ShowDialog(this);};header.Controls.Add(sponsor);
         var star=new ActionButton{Text="点个 Star",Dock=DockStyle.Right,Width=112,BorderWidth=0};
         star.Click+=(_,_)=>{using var form=new SupportForm(false);form.ShowDialog(this);};header.Controls.Add(star);title.BringToFront();
+        var language=new ActionButton{Text="中文 / EN",Dock=DockStyle.Right,Width=116,BorderWidth=0,AccessibleName="Language / 界面语言"};
+        var languageMenu=new ContextMenuStrip();
+        var chinese=languageMenu.Items.Add("简体中文");var english=languageMenu.Items.Add("English");
+        void SelectLanguage(bool useEnglish){try{UiLanguage.Change(useEnglish);foreach(ToolStripItem item in menuForLanguage.Items)item.Text=UiLanguage.T(UiLanguage.Original(item.Text));tray.Text=UiLanguage.T("邮件接收管理");}catch(Exception e){MessageBox.Show(this,e.Message,"Language");}}
+        chinese.Click+=(_,_)=>SelectLanguage(false);english.Click+=(_,_)=>SelectLanguage(true);
+        language.Click+=(_,_)=>{((ToolStripMenuItem)chinese).Checked=!UiLanguage.English;((ToolStripMenuItem)english).Checked=UiLanguage.English;languageMenu.Show(language,new Point(0,language.Height));};
+        language.Disposed+=(_,_)=>languageMenu.Dispose();
+        header.Controls.Add(language);title.BringToFront();
         var tabs=new PageDeck(true);navigation=tabs;
         var split=new SplitContainer{Size=new Size(1000,550),Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=230,Panel1MinSize=170,Panel2MinSize=180,SplitterWidth=12,BackColor=Design.Background};
         split.Panel1.Controls.Add(Design.Card("绑定邮箱 · 选中邮箱后管理其规则",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));
@@ -68,7 +78,7 @@ internal sealed class MainForm : Form
         accounts.SelectionChanged+=(_,_)=>RefreshRules();
         accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellDoubleClick+=(_,_)=>EditRule();events.CellDoubleClick+=(_,_)=>ShowEvent();
         RefreshAccounts();RefreshRecords();Design.AttachOptionHelp(this);
-        var menu=new ContextMenuStrip();menu.Items.Add("显示窗口",null,(_,_)=>ShowWindow());menu.Items.Add("暂停检查",null,(_,_)=>Pause());menu.Items.Add("退出",null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
+        var menu=menuForLanguage;menu.Items.Add(UiLanguage.T("显示窗口"),null,(_,_)=>ShowWindow());menu.Items.Add(UiLanguage.T("暂停检查"),null,(_,_)=>Pause());menu.Items.Add(UiLanguage.T("退出"),null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
         FormClosing+=(_,e)=>{if(!exiting&&!smoke){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"邮件接收管理","已转到托盘运行。右键托盘图标可退出。",ToolTipIcon.Info);}};
         timer.Tick+=async(_,_)=>{if(updateExit.WaitOne(0)){ExitApp();return;}if(!exiting&&running&&!busy&&DateTime.Now>=next)await RunCycle();};
         if(!smoke){timer.Start();if(settings.RunOnLaunch){running=true;Log("已恢复保存的自动检查设置。");}}

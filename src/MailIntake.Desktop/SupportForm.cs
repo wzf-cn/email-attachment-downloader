@@ -4,6 +4,7 @@ namespace MailIntake.Desktop;
 
 internal sealed class SupportForm : Form
 {
+    protected override void OnShown(EventArgs e){base.OnShown(e);UiLanguage.Apply(this);}
     public SupportForm(bool sponsor)
     {
         Text=sponsor?"赞助支持":"点个 Star";

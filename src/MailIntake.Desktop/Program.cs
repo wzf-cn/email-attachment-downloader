@@ -6,6 +6,7 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        UiLanguage.Load();
         if(args.Contains("--update")){Updater.Run();return;}
         bool smoke=args.Contains("--smoke-test");
         using var mutex=new Mutex(true,smoke?"Local\\MailIntakeSmoke":"Local\\KeywordMailDownloader",out bool created);
@@ -13,6 +14,7 @@ internal static class Program
         try
         {
             if(smoke)SmokeChecks.Run();
+            if(smoke&&Environment.GetEnvironmentVariable("MAILINTAKE_TEST_LANGUAGE")=="en")UiLanguage.Change(true);
             using var form=new MainForm(smoke);
             if(smoke)
             {

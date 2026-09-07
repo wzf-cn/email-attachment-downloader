@@ -10,6 +10,28 @@ internal static class SmokeChecks
     public static void Run()
     {
         if(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAILINTAKE_TEST_HOME")))throw new InvalidOperationException("Smoke tests require an isolated data directory.");
+        using(var editor=new AccountEditor())
+        {
+            T Find<T>(string name) where T:Control=>(T)editor.Controls.Find(name,true).Single();
+            var address=Find<AntdUI.Input>("accountAddress");var host=Find<AntdUI.Input>("incomingHost");var smtp=Find<AntdUI.Input>("smtpHost");var protocol=Find<ComboBox>("incomingProtocol");
+            address.Text="test@163.com";
+            if(host.Text!="imap.163.com"||smtp.Text!="smtp.163.com")throw new Exception("Provider IMAP defaults failed");
+            protocol.SelectedItem="POP3";
+            if(host.Text!="pop.163.com"||Find<NumericUpDown>("incomingPort").Value!=995)throw new Exception("Provider POP defaults failed");
+            address.Text="test@unknown.example";
+            if(host.Text!=""||smtp.Text!="")throw new Exception("Unknown provider kept stale defaults");
+            address.Text="test@sina.cn";host.Text="custom.example";smtp.Text="outgoing.example";address.Text="test@gmail.com";
+            if(host.Text!="custom.example"||smtp.Text!="outgoing.example")throw new Exception("Manual server edits were overwritten");
+            UiLanguage.Change(true);UiLanguage.Apply(editor);
+            if(editor.Text!="Add account"||address.Text!="test@gmail.com"||protocol.Text!="POP3")throw new Exception("Localization changed account data");
+            UiLanguage.Change(false);UiLanguage.Apply(editor);
+            if(editor.Text!="绑定邮箱"||host.Text!="custom.example")throw new Exception("Language round trip failed");
+        }
+        using(var editor=new AccountEditor(new(){Address="test@163.com",Host="private.example",SmtpHost="private-smtp.example"}))
+        {
+            ((AntdUI.Input)editor.Controls.Find("accountAddress",true).Single()).Text="test@qq.com";
+            if(((AntdUI.Input)editor.Controls.Find("incomingHost",true).Single()).Text!="private.example")throw new Exception("Existing account overwritten");
+        }
         string protectedValue=LocalSettings.Encrypt("synthetic-test-password");
         if(LocalSettings.Decrypt(protectedValue)!="synthetic-test-password")throw new Exception("DPAPI round-trip failed");
         string legacy=Path.Combine(LocalSettings.Root,"legacy");Directory.CreateDirectory(legacy);

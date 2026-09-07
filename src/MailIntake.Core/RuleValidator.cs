@@ -22,7 +22,7 @@ public static class RuleValidator
         if (rule.KeyMode == "名单")
         {
             if (!rule.Roster.TryGetValue(parts[^1],out var name)) return Validation.WrongKey;
-            int index = rule.Fields.IndexOf("姓名");
+            int index = rule.Fields.FindIndex(f=>f=="姓名"||f.Equals("Name",StringComparison.OrdinalIgnoreCase));
             if (name.Length>0 && index>=0 && parts[index]!=name) return Validation.Structure;
         }
         else if (parts[^1] != rule.SubjectKey) return Validation.WrongKey;

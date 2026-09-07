@@ -62,6 +62,21 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("provider detection uses exact domains and secure protocol defaults",()=>
+        {
+            Eq("QQ",MailProviders.Find(" user@FOXMAIL.COM ")!.Name);
+            Eq(true,MailProviders.Find("user@qq.com.evil.example") is null);
+            Eq(true,MailProviders.Find("user@@qq.com") is null);
+            Eq(true,MailProviders.Find("user@example.org") is null);
+            Eq("pop3.aliyun.com",MailProviders.Find("user@aliyun.com")!.Incoming("POP3").Host);
+            Eq(993,MailProviders.Find("user@sina.cn")!.Incoming("IMAP").Port);
+            Eq(true,MailProviders.Find("user@outlook.com")!.RequiresOAuth);
+            Eq("STARTTLS",MailProviders.Find("user@outlook.com")!.SmtpSecurity);
+            var f=new Fixture();f.Rule.Fields=["Name"];f.Rule.Roster["00123"]="Alice";
+            Eq(Validation.Structure,RuleValidator.Match(f.Rule.Prefix+"-Bob-00123",f.Rule));
+            Eq(Validation.Success,RuleValidator.Match(f.Rule.Prefix+"-Alice-00123",f.Rule));
+            return Task.CompletedTask;
+        });
         await Test("rule templates preserve reusable settings and create independent task rules",()=>
         {
             var f=new Fixture();f.Rule.FlatAttachments=true;f.Rule.DownloadBody=false;f.Rule.MaxAttachmentMb=7;f.Rule.SubjectKey="private-test-key";

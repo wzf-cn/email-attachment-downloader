@@ -16,7 +16,7 @@ internal class EditorForm : Form
         var cancel=new ActionButton{Text="取消",Width=90,Height=38,DialogResult=DialogResult.Cancel};Footer.Controls.Add(cancel);CancelButton=cancel;
     }
     internal PageDeck? Sections {get;private set;}
-    protected override void OnShown(EventArgs e){base.OnShown(e);Design.AttachOptionHelp(this);}
+    protected override void OnShown(EventArgs e){base.OnShown(e);Design.AttachOptionHelp(this);UiLanguage.Apply(this);}
     protected void Section(string title)
     {
         if(Sections is null)
@@ -52,6 +52,7 @@ internal sealed class AccountEditor : EditorForm
         Result=old??new();var source=Result;
         Section("邮箱登录");
         var address=TextField("邮箱地址",source.Address);
+        address.Name="accountAddress";
         var password=TextField("授权码（留空保留原值）","",true);
         var since=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.Since});
         var enabled=Field("启用",new CheckBox{Checked=source.Enabled,Text="启用此邮箱"});
@@ -62,29 +63,30 @@ internal sealed class AccountEditor : EditorForm
         var folder=TextField("IMAP 文件夹",source.Folder);
         var smtp=TextField("SMTP 发信服务器",source.SmtpHost);var smtpPort=Number("SMTP 端口",source.SmtpPort,1,65535);
         var smtpSecurity=Choice("发信加密",source.SmtpSecurity,"SSL/TLS","STARTTLS");
-        var preset=Choice("SMTP 默认配置","自定义 / 保留现值","自定义 / 保留现值","QQ","163","126");
-        var applyPreset=Field("",new ActionButton{Text="应用所选 SMTP 默认值",Height=32});
-        void ApplySmtp(string provider)
+        host.Name="incomingHost";port.Name="incomingPort";smtp.Name="smtpHost";smtpPort.Name="smtpPort";protocol.Name="incomingProtocol";
+        var preset=Choice("邮箱服务商","自定义 / 保留现值",new[]{"自定义 / 保留现值"}.Concat(MailProviders.All.Select(p=>p.Name)).ToArray());
+        var applyPreset=Field("",new ActionButton{Text="应用收发默认参数",Height=38});
+        var providerNote=Field("识别结果",new Label{AutoSize=true,Text="输入完整邮箱地址后自动识别；未知域名请手动填写。"});
+        Field("说明",new Label{AutoSize=true,Text="请先在邮箱网页开启 IMAP/POP3 和 SMTP，并使用授权码或应用专用密码。自动填入不会覆盖已有邮箱或手动修改的服务器；点击应用可主动替换。"});
+        if(old is null){host.Text="";smtp.Text="";}
+        var lastIncoming=(host.Text,(int)port.Value,security.Text);
+        var lastOutgoing=(smtp.Text,(int)smtpPort.Value,smtpSecurity.Text);
+        void ApplyProvider(MailProvider? provider,bool force=false,bool incomingOnly=false)
         {
-            string? server=provider switch{"QQ"=>"smtp.qq.com","163"=>"smtp.163.com","126"=>"smtp.126.com",_=>null};
-            if(server is null)return;
-            smtp.Text=server;smtpPort.Value=465;smtpSecurity.SelectedItem="SSL/TLS";
+            bool canIn=force||(old is null&&(host.Text,(int)port.Value,security.Text)==lastIncoming);
+            bool canOut=!incomingOnly&&(force||(old is null&&(smtp.Text,(int)smtpPort.Value,smtpSecurity.Text)==lastOutgoing));
+            if(canIn){var entry=provider?.Incoming(protocol.Text)??("",protocol.Text=="POP3"?995:993,"SSL/TLS");host.Text=entry.Item1;port.Value=entry.Item2;security.SelectedItem=entry.Item3;lastIncoming=(host.Text,(int)port.Value,security.Text);}
+            if(canOut){smtp.Text=provider?.Smtp??"";smtpPort.Value=provider?.SmtpPort??465;smtpSecurity.SelectedItem=provider?.SmtpSecurity??"SSL/TLS";lastOutgoing=(smtp.Text,(int)smtpPort.Value,smtpSecurity.Text);}
+            providerNote.Text=provider is null?"未识别此域名，请选择服务商或手动填写服务器。":provider.RequiresOAuth?"此服务商要求 OAuth2 登录；当前版本仅支持授权码，填入参数后仍无法直接登录。":(!canIn||(!incomingOnly&&!canOut))?"已识别服务商；保留已有或手动修改的参数。需要替换时点击应用。":"已填入收发默认参数，可按服务商要求修改。请使用授权码或应用专用密码。";
         }
-        applyPreset.Click+=(_,_)=>ApplySmtp(preset.Text);
-        var lastDefault=(Host:source.SmtpHost,Port:source.SmtpPort,Security:source.SmtpSecurity);
-        address.Leave+=(_,_)=>
+        applyPreset.Click+=(_,_)=>{var provider=MailProviders.All.FirstOrDefault(p=>p.Name==preset.Text);if(provider!=null)ApplyProvider(provider,true);};
+        address.TextChanged+=(_,_)=>
         {
-            string provider=address.Text.Trim().Split('@').Last().ToLowerInvariant() switch{"qq.com"=>"QQ","163.com"=>"163","126.com"=>"126",_=>"自定义 / 保留现值"};
-            preset.SelectedItem=provider;
-            // Existing accounts and manually changed settings are never silently overwritten.
-            if(old is null && (smtp.Text,(int)smtpPort.Value,smtpSecurity.Text)==lastDefault)
-            {
-                ApplySmtp(provider);
-                lastDefault=(smtp.Text,(int)smtpPort.Value,smtpSecurity.Text);
-            }
+            if(!LocalSettings.MailboxValid(address.Text.Trim()))return;
+            var provider=MailProviders.Find(address.Text);preset.SelectedItem=provider?.Name??"自定义 / 保留现值";ApplyProvider(provider);
         };
-        Field("说明",new Label{AutoSize=true,Text="QQ、163、126 的 SMTP 默认值为对应服务器 / 465 / SSL/TLS。新建邮箱填写地址后自动填入；已有配置可点击应用。收信参数请单独填写。POP3 按邮件 Date 筛选；此版本使用授权码登录。"});
-        protocol.SelectedIndexChanged+=(_,_)=>{if(source.Host=="imap.qq.com"||source.Host=="pop.qq.com"){host.Text=protocol.Text=="POP3"?"pop.qq.com":"imap.qq.com";port.Value=protocol.Text=="POP3"?995:993;}};
+        protocol.SelectedIndexChanged+=(_,_)=>{var provider=MailProviders.All.FirstOrDefault(p=>p.Name==preset.Text);if(provider!=null)ApplyProvider(provider,false,true);};
+        if(old!=null){preset.SelectedItem=MailProviders.Find(source.Address)?.Name??"自定义 / 保留现值";ApplyProvider(MailProviders.Find(source.Address));}
         SaveButton(()=>
         {
             if(!LocalSettings.MailboxValid(address.Text.Trim())||string.IsNullOrWhiteSpace(host.Text)||string.IsNullOrWhiteSpace(smtp.Text))throw new ArgumentException("请填写有效的邮箱地址及服务器。");
@@ -119,6 +121,7 @@ internal sealed class RuleEditor : EditorForm
         var rosterButton=Field("批量名单",new ActionButton{Text=$"导入 CSV · 已有 {roster.Count} 条",Height=32});
         rosterButton.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="学号名单 CSV|*.csv"};if(picker.ShowDialog(this)!=DialogResult.OK)return;try{var data=RuleValidator.ImportRoster(picker.FileName);roster=data;keyMode.Text="名单";rosterButton.Text=$"导入 CSV · 已有 {roster.Count} 条";}catch(Exception e){MessageBox.Show(this,e.Message,"导入失败");}};
         var preview=Field("主题示例",new Label{AutoSize=true,ForeColor=Color.FromArgb(22,100,220)});
+        preview.Tag="keep-text";
         void UpdateSubject()
         {
             bool structured=mode.Text=="结构校验";
