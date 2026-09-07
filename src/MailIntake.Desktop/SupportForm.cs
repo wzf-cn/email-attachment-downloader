@@ -62,6 +62,16 @@ internal sealed class SupportForm : Form
     private void AddLink(Control parent,string text,string address)
     {
         var button=new ActionButton{Text=text,Width=174,Height=40};
+        if(text=="PayPal 赞助")
+        {
+            using var stream=typeof(SupportForm).Assembly.GetManifestResourceStream("MailIntake.PayPal.svg")!;
+            using var reader=new StreamReader(stream);
+            button.IconSvg=reader.ReadToEnd();button.IconSize=new Size(28,28);
+            button.Width=240;button.MinimumSize=new Size(240,40);
+            button.DefaultBack=Color.FromArgb(230,245,255);
+            button.DefaultBorderColor=Color.FromArgb(0,140,255);
+            button.ForeColor=Color.FromArgb(0,41,145);
+        }
         button.Click+=(_,_)=>
         {
             OpenLink(address);
