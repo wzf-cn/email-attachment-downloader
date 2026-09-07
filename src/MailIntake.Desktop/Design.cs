@@ -18,6 +18,7 @@ internal sealed class ActionButton : AntdUI.Button
         string description=ButtonHelp.Describe(label);
         if(UiLanguage.English)description=label switch
         {
+            "检查软件更新"=>"Check GitHub and Gitee for a newer stable release. No files are replaced automatically.",
             "测试连接"=>"Test incoming and outgoing sign-in without sending email.",
             "保存并开始"=>"Save settings and start checking messages, including matching mail since the start date.",
             "应用收发默认参数"=>"Replace incoming and outgoing server settings with the selected provider defaults.",
@@ -42,6 +43,7 @@ internal static class ButtonHelp
 {
     public static string Describe(string text)=>text switch
     {
+        "检查软件更新"=>"查询 GitHub 和 Gitee 正式发布版本，发现更新后可打开官方页面下载。",
         "邮箱与规则"=>"管理绑定的邮箱，以及每个邮箱的收件规则。",
         "归档记录"=>"查看已保存邮件的发件人、时间和文件位置。",
         "回复记录"=>"查看自动回复的发送状态及结果。",

@@ -73,6 +73,10 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+启动时检查软件更新|Check for software updates at startup
+软件更新|Software updates
+检查软件更新|Check for updates
+无法保存更新设置。|Could not save update preferences.
 邮件接收管理|Mail Intake
 邮箱与规则|Accounts / rules
 归档记录|Archives

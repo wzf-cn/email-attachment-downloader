@@ -10,6 +10,13 @@ internal static class SmokeChecks
     public static void Run()
     {
         if(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAILINTAKE_TEST_HOME")))throw new InvalidOperationException("Smoke tests require an isolated data directory.");
+        var stable=ReleaseUpdates.Parse("{\"tag_name\":\"v1.10.0\",\"html_url\":\"https://untrusted.example\"}",true);
+        if(stable?.Version<=new Version(1,9,0,0)||stable?.Page!="https://github.com/wzf-cn/email-attachment-downloader/releases/tag/v1.10.0")throw new Exception("Update version ordering or trusted URL failed");
+        foreach(var json in new[]{"{\"tag_name\":\"v9.0.0-beta\"}","{\"tag_name\":\"v9.0.0\",\"draft\":true}","{\"tag_name\":\"v9.0.0\",\"prerelease\":true}","{\"tag_name\":\"../../malicious\"}"})
+            if(ReleaseUpdates.Parse(json,false)!=null)throw new Exception("Unsafe or prerelease update accepted");
+        if(ReleaseUpdates.Parse("{\"tag_name\":\"1.3.3\"}",false)?.Version!=new Version(1,3,3,0))throw new Exception("Gitee release parsing failed");
+        ReleaseUpdates.SetEnabled(false);if(ReleaseUpdates.Enabled)throw new Exception("Update opt-out failed");
+        ReleaseUpdates.SetEnabled(true);if(!ReleaseUpdates.Enabled)throw new Exception("Update opt-in failed");
         using(var editor=new AccountEditor())
         {
             T Find<T>(string name) where T:Control=>(T)editor.Controls.Find(name,true).Single();

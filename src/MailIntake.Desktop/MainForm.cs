@@ -29,7 +29,15 @@ internal sealed class MainForm : Form
     private DateTime next=DateTime.MinValue;
     private readonly bool smoke;
     private readonly ContextMenuStrip menuForLanguage=new();
-    protected override void OnShown(EventArgs e){base.OnShown(e);UiLanguage.Apply(this);}
+    private readonly CancellationTokenSource updateCancellation=new();
+    private bool checkingUpdate;
+    protected override async void OnShown(EventArgs e){base.OnShown(e);UiLanguage.Apply(this);if(!smoke&&ReleaseUpdates.Enabled)await CheckSoftwareUpdate(false);}
+    private async Task CheckSoftwareUpdate(bool manual)
+    {
+        if(checkingUpdate)return;checkingUpdate=true;
+        try{await ReleaseUpdates.Show(this,manual,updateCancellation.Token);}
+        finally{checkingUpdate=false;}
+    }
     private readonly EventWaitHandle updateExit=new(false,EventResetMode.AutoReset,"Local\\MailIntakeUpdateExit");
     public MainForm(bool smoke=false)
     {
@@ -68,8 +76,16 @@ internal sealed class MainForm : Form
         void Option(string label,Control control){int row=options.RowCount++;control.Margin=new Padding(4,12,4,12);options.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,ForeColor=Design.Ink},0,row);options.Controls.Add(control,1,row);}
         Option("自动检查间隔（分钟）",interval);Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("连续错误几次后停收",errorThreshold);Option("开机启动",autoStart);
         Option("历史邮件",reexport);
+        var updates=new CheckBox{Text="启动时检查软件更新",AutoSize=true,Checked=ReleaseUpdates.Enabled};
+        updates.CheckedChanged+=(_,_)=>{try{ReleaseUpdates.SetEnabled(updates.Checked);}catch{MessageBox.Show(this,UiLanguage.T("无法保存更新设置。"));}};
+        Option("软件更新",updates);
+        var checkUpdate=new ActionButton{Text="检查软件更新",Width=220,MinimumSize=new Size(220,38)};
+        checkUpdate.Click+=async(_,_)=>await CheckSoftwareUpdate(true);
+        Option("v"+ReleaseUpdates.Current.ToString(3),checkUpdate);
+        FormClosed+=(_,_)=>updateCancellation.Cancel();
         Option("设置生效",new Label{AutoSize=true,MaximumSize=new Size(570,0),ForeColor=Design.Muted,Text="修改后点击下方“保存并开始”。重新导出仅用于下一次检查，不重复自动回复。邮件上限用于跳过整封大邮件；附件大小在各组规则中设置。"});
-        AddPage(tabs,"运行设置",options,null);
+        var optionsScroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true};optionsScroll.Controls.Add(options);
+        AddPage(tabs,"运行设置",optionsScroll,null);
         var bottom=new Panel{Dock=DockStyle.Bottom,Height=120,Padding=new Padding(20,4,12,4),BackColor=Color.White};
         status.AutoSize=false;status.Dock=DockStyle.Top;status.Height=46;
         var controls=Toolbar(("保存并开始",SaveStart),("立即检查",CheckNow),("暂停",Pause),("退出软件",ExitApp));controls.Dock=DockStyle.Bottom;
