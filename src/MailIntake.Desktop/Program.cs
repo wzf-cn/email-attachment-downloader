@@ -35,8 +35,8 @@ internal static class Program
                 using var sponsor=new SupportForm(true);sponsor.Show(form);Capture(sponsor,"sponsor");sponsor.Close();
                 using var instructions=new SubjectInstructionsForm("工程实践报告",new MailIntake.Core.MailRule{Keywords=["工程实践"],Fields=["姓名"],KeyMode="名单"});instructions.Show(form);Capture(instructions,"instructions");instructions.Close();
                 using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);
-                for(int i=0;i<rule.Sections!.PageCount;i++){rule.Sections.SelectPage(i);Capture(rule,"rule"+i);}
-                rule.Size=rule.MinimumSize;rule.Sections.SelectPage(1);Capture(rule,"rule-small");rule.Close();
+                Capture(rule,"rule0");rule.ScrollToEnd();Capture(rule,"rule-bottom");
+                rule.Size=rule.MinimumSize;rule.ScrollToEnd();Capture(rule,"rule-small");rule.Close();
                 for(int i=0;i<form.Navigation.PageCount;i++){form.Navigation.SelectPage(i);Capture(form,"page"+i);}
                 form.Navigation.SelectPage(0);Capture(form,"");form.Size=form.MinimumSize;Capture(form,"small");
                 File.WriteAllText(Path.Combine(LocalSettings.Root,"smoke-result.txt"),"WINDOWS_FORMS_SMOKE_OK");return;

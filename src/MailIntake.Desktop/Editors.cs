@@ -100,11 +100,18 @@ internal sealed class AccountEditor : EditorForm
 
 internal sealed class RuleEditor : EditorForm
 {
+    internal void ScrollToEnd()=>Body.AutoScrollPosition=new Point(0,Fields.Height);
+    private void InlineHeading(string title)
+    {
+        int row=Fields.RowCount++;
+        var heading=Design.Heading(title,11);heading.Dock=DockStyle.Fill;heading.Margin=new Padding(4,22,4,8);
+        Fields.Controls.Add(heading,0,row);Fields.SetColumnSpan(heading,2);
+    }
     public MailRule Result{get;private set;}
     public RuleEditor(MailRule? old=null,bool fromTemplate=false):base(fromTemplate?"从模板新增规则":old is null?"新增规则 · 关键词与目录成组保存":"编辑规则")
     {
         Result=old??new();var source=Result;Height=840;
-        Section("触发与主题");
+
         var instructionTopic=TextField("本次邮件主题",source.InstructionTopic);
         Field("主题填写示例",new Label{AutoSize=true,Text="例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。"});
         var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
@@ -120,7 +127,6 @@ internal sealed class RuleEditor : EditorForm
         var searchBody=new CheckBox{Text="检索正文",AutoSize=true,Checked=source.SearchBody};
         var searchAttachments=new CheckBox{Text="检索附件名",AutoSize=true,Checked=source.SearchAttachmentNames};
         var scopes=new FlowLayoutPanel{AutoSize=true};scopes.Controls.AddRange([searchSubject,searchBody,searchAttachments]);Field("检索范围",scopes);
-        Field("检索说明",new Label{AutoSize=true,Text="可多选。全部匹配时，每个关键词可出现在不同范围。正文或附件名检索需先接收邮件；不搜索附件内部内容。结构校验仍只校验主题。"});
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
         var separator=TextField("字段分隔符",source.Separator);
@@ -142,7 +148,7 @@ internal sealed class RuleEditor : EditorForm
         }
         mode.SelectedIndexChanged+=(_,_)=>UpdateSubject();keyMode.SelectedIndexChanged+=(_,_)=>UpdateSubject();
         separator.TextChanged+=(_,_)=>UpdateSubject();fields.TextChanged+=(_,_)=>UpdateSubject();UpdateSubject();
-        Section("下载与存放");
+        InlineHeading("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
         var downloadBody=Field("下载内容",new CheckBox{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
@@ -153,12 +159,12 @@ internal sealed class RuleEditor : EditorForm
         Field("超限处理",new Label{AutoSize=true,Text="默认 20 MB；超过时仅记录文件名、大小和原因，不导出该文件，也不保存包含它的完整 EML。其他附件照常导出。当前需接收邮件后判断附件大小；若要避免接收整封大邮件，请同时设置主界面的邮件上限。"});
         var saveOriginal=Field("",new CheckBox{Text="保存原始邮件 EML（包含完整正文和随信附件）",Checked=source.SaveOriginal});
         Field("保存说明",new Label{AutoSize=true,Text="三项可独立选择；全部取消时仅保存发件人、时间等记录。若不想保存正文或附件的任何副本，也请取消原始邮件 EML。修改后需重新导出才能应用到历史邮件。"});
-        Section("回复与安全");
+        InlineHeading("回复与安全");
         var replies=Field("自动回复",new CheckBox{Text="完整匹配时回复；错误主题按统一策略回复",Checked=source.ReplyEnabled});
         var success=TextField("完整匹配回复正文",source.SuccessReply,false,3);
         var detect=Field("异常检查",new CheckBox{Text="检查同主题、不同发件邮箱的正文与附件差异",Checked=source.DetectAnomaly});
         Field("错误与停收策略",new Label{AutoSize=true,Text="错误统一回复："+Constants.ErrorReply+"。默认连续 3 次错误后通知联系管理员并停收；次数可在“运行设置”调整。完整主题校验成功后清零，已停收须管理员重置。"});
-        Section("测试识别");
+        InlineHeading("测试识别");
         var sample=TextField("测试主题（不发送邮件）","");
         var sampleBody=TextField("测试正文","",false,3);
         var sampleNames=TextField("测试附件名（逗号分隔）","");
