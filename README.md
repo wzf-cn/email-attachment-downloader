@@ -4,15 +4,19 @@
 
 这是依赖 MailKit 的独立应用，不是 MailKit 官方产品或其源代码分支。
 
+[GitHub 主仓库](https://github.com/wzf-cn/email-attachment-downloader) · [Gitee 镜像](https://gitee.com/wzFeel/email-attachment-downloader) · [仓库与发布管理](docs/REPOSITORY_MANAGEMENT.md)
+
+本项目采用 [MIT 许可证](LICENSE)，允许商用、修改和分发，需保留许可证及版权声明。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 ## 运行
 
-右上角“意见反馈”可填写问题或建议，保存为本地文本（默认 `%LOCALAPPDATA%\MailIntake\Feedback`），或复制内容并打开 Gitee Issues 页面。用户需在网页中新建 Issue 并确认提交，软件不会自动上传反馈，也不附带邮箱配置、邮件或日志。
+右上角“意见反馈”可填写问题或建议，由用户点击发送后通过 HTTPS 提交至自建后台；联系方式可不填，失败时保留本地草稿（默认 `%LOCALAPPDATA%\MailIntake\Feedback`）。不自动附带邮箱配置、邮件或日志。官方版本默认反馈地址为 `https://wuzhuofei.com/mail-feedback/api/feedback`；自行分发时请按 [部署说明](docs/FEEDBACK_DEPLOYMENT.md) 配置自己的反馈服务。
 
 异常通知按一轮检查汇总：检查过程中保留逐条日志和审计记录，不逐封弹出提醒；本轮结束（含暂停）时，只弹出一条异常总数提醒。无异常不弹出，退出软件时不弹出。同一封邮件可能产生多条不同异常，统计的是提示条数而非邮件封数。
 
 安装完成页提供默认勾选的“立即运行邮件接收管理”：点击“完成”后启动软件；取消勾选则只结束安装。静默安装不自动启动。
 
-推荐运行 `MailIntake-Setup-1.0.0.exe` 安装包，按向导安装到当前 Windows 用户目录，无需管理员权限。安装后从开始菜单“邮件接收管理”启动。后续直接运行新版安装包覆盖安装；如果软件正在运行，会询问是否退出再继续，等待最多 60 秒，不强制结束进程。
+推荐运行对应版本的 `MailIntake-Setup-版本号.exe` 安装包，按向导安装到当前 Windows 用户目录，无需管理员权限。安装后从开始菜单“邮件接收管理”启动。后续直接运行新版安装包覆盖安装；如果软件正在运行，会询问是否退出再继续，等待最多 60 秒，不强制结束进程。
 
 卸载：Windows“设置 → 应用 → 已安装的应用 → 邮件接收管理 → 卸载”，或开始菜单中的“卸载”。卸载仅移除安装包提供的程序文件、快捷方式及对应启动项，保留 `%LOCALAPPDATA%\MailIntake` 下的配置和记录，以及用户指定的下载目录。重新安装后在同一 Windows 用户下可以继续使用。未保存的界面修改需在退出前保存。
 
@@ -139,9 +143,9 @@ dotnet run --project tests/MailIntake.Tests/MailIntake.Tests.csproj
 
 ## 交付边界
 
-当前为 0.1 桌面版本。尚未用真实 QQ 邮箱授权码收发、未验证机器重启后的登录启动，也未做代码签名或安装器。离线测试和界面检查不能替代真实邮箱兼容性验证。
+当前版本为 1.2.2，提供安装包与便携版。已进行自动化业务测试和隔离界面检查，安装更新与卸载验证记录见 docs。尚未用真实 QQ 邮箱授权码完成收发验收，未验证机器重启后的登录启动。发布包未做数字签名，Windows 可能显示安全提醒。离线测试和界面检查不能替代真实邮箱兼容性验证。
 
-主项目尚未选择公开开源许可证；未因此授予第三方复制或分发本项目的许可。第三方组件各自的许可与声明见 `THIRD_PARTY_NOTICES.md` 和 `licenses/`，MailKit 的 MIT 许可不自动覆盖本应用的自有代码。
+源码仓库不包含用户邮箱配置、授权码、邮件、真实名单、反馈数据或服务器备份。问题反馈与贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题见 [SECURITY.md](SECURITY.md)。
 
 ### 1.1.0 界面更新
 

@@ -11,6 +11,7 @@ try {
     & $Dotnet publish src/MailIntake.Desktop/MailIntake.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o artifacts/win-x64
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
     Copy-Item -LiteralPath README.md -Destination artifacts/win-x64/README.md
+    Copy-Item -LiteralPath LICENSE -Destination artifacts/win-x64/LICENSE
     Copy-Item -LiteralPath THIRD_PARTY_NOTICES.md -Destination artifacts/win-x64/THIRD_PARTY_NOTICES.md
     Copy-Item -LiteralPath licenses -Destination artifacts/win-x64/licenses -Recurse -Force
     Set-Content -LiteralPath artifacts/win-x64/Update.cmd -Value '@start "" "%~dp0MailIntake.exe" --update' -Encoding ascii

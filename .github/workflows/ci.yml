@@ -1,0 +1,29 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.400'
+      - run: dotnet restore src/MailIntake.Desktop/MailIntake.Desktop.csproj --locked-mode
+      - run: dotnet build src/MailIntake.Desktop/MailIntake.Desktop.csproj -c Release --no-restore
+      - run: dotnet run --project tests/MailIntake.Tests/MailIntake.Tests.csproj -c Release
+  feedback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s feedback-server -p test_server.py -v

@@ -21,3 +21,10 @@ test-results/
 
 .deployment/
 **/__pycache__/
+.ssh/
+backups/
+Feedback/
+*.tar.gz
+*.7z
+*.dmp
+ip-salt
