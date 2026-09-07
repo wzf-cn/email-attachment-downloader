@@ -14,7 +14,8 @@ internal sealed class SupportForm : Form
         var content=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true};
         Controls.Add(content);
         void Note(string text,int height)=>content.Controls.Add(new Label{Text=text,Width=sponsor?720:450,Height=height,ForeColor=Design.Muted,Margin=new Padding(0,8,0,12)});
-        var heading=Design.Heading(sponsor?"请作者喝杯咖啡":"觉得好用？点个 Star 支持一下",14);heading.Width=450;content.Controls.Add(heading);
+        var heading=Design.Heading(sponsor?"请作者喝杯咖啡":"觉得好用？点个 Star 支持一下",14);heading.Width=450;
+        var headingRow=new FlowLayoutPanel{Width=sponsor?720:450,Height=52,WrapContents=false,Margin=Padding.Empty};headingRow.Controls.Add(heading);content.Controls.Add(headingRow);
         if(!sponsor)
         {
             Note("你的 Star 能让更多人发现这个项目。选择一个平台，登录后点击仓库页面上的 Star 即可。",54);
@@ -31,7 +32,7 @@ internal sealed class SupportForm : Form
             try
             {
                 if(File.Exists(addressFile)&&Uri.TryCreate(File.ReadAllText(addressFile).Trim(),UriKind.Absolute,out var address)&&address.Scheme=="https"&&string.IsNullOrEmpty(address.UserInfo))
-                {AddLink(content,"打开打赏页面",address.AbsoluteUri);available=true;}
+                {AddLink(headingRow,address.Host.Equals("paypal.me",StringComparison.OrdinalIgnoreCase)?"PayPal 赞助":"打开打赏页面",address.AbsoluteUri);available=true;}
                 var codes=new FlowLayoutPanel{Width=720,Height=490,WrapContents=false,Margin=Padding.Empty};
                 foreach(var (file,label) in new[]{("wechat.png","微信支付"),("alipay.jpg","支付宝")})
                 {

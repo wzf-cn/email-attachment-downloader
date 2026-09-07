@@ -251,7 +251,7 @@ SMTP 端口|SMTP port
 请作者喝杯咖啡|Buy the developer a coffee
 觉得好用？点个 Star 支持一下|Like this app? Give it a Star
 你的 Star 能让更多人发现这个项目。选择一个平台，登录后点击仓库页面上的 Star 即可。|Help others discover this project. Choose a platform, sign in, and click Star on the repository page.
-感谢你支持开发与维护。打赏完全自愿，不影响任何软件功能。|Thank you for supporting development. Donations are optional and do not affect any features.
+感谢你支持开发与维护。打赏完全自愿，不影响任何软件功能。|Thank you! Donations are optional; all features remain available.
 GitHub 点 Star|Star on GitHub
 Gitee 点 Star|Star on Gitee
 微信支付|WeChat Pay
@@ -259,6 +259,7 @@ Gitee 点 Star|Star on Gitee
 查看微信支付原图|Open WeChat QR image
 查看支付宝原图|Open Alipay QR image
 打开打赏页面|Open donation page
+PayPal 赞助|Donate via PayPal
 打赏信息暂时无法显示，请稍后再试。|Donation details are unavailable. Please try again later.
 作者尚未提供打赏方式。你也可以通过点 Star 或反馈建议支持项目，谢谢！|No donation method is configured. You can also support the project with a Star or feedback. Thank you!
 操作未完成|Action not completed

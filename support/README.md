@@ -1,8 +1,8 @@
 # 赞助信息
 
-官方收款码由维护者提供并授权随软件及公开源码分发，原图保持不变。
+收款码和赞助链接由维护者提供，二维码原图保持不变。
 
-- `sponsor-url.txt`：一行完整 HTTPS 打赏页面地址。
+- `sponsor-url.txt`：一行完整 HTTPS 打赏页面地址，当前为维护者提供的 https://paypal.me/wzFelix 。
 - `wechat.png`：微信支付收款码原图。
 - `alipay.jpg`：支付宝收款码原图。
 
