@@ -65,10 +65,17 @@ sealed class Suite
         await Test("subject instructions explain fields without leaking roster or secret",()=>
         {
             var rule=new MailRule{Keywords=["工程实践"],Fields=["姓名","班级"],KeyMode="固定秘钥",SubjectKey="PRIVATE_KEY_123",Roster=new(){{"PRIVATE_ID","PRIVATE_NAME"}}};
-            var text=SubjectInstructions.Generate("工程实践报告",rule);
-            Eq(true,text.Contains("工程实践报告-{姓名}-{班级}-{管理员提供的秘钥}"));Eq(false,text.Contains("PRIVATE_"));
-            rule.KeyMode="名单";Eq(true,SubjectInstructions.Generate("工程实践报告",rule).Contains("保留开头的 0"));
-            rule.Mode="关键词";Eq(false,SubjectInstructions.Generate("工程实践报告",rule).Contains("{姓名}"));
+            var text=SubjectInstructions.Generate(rule);
+            Eq(true,text.Contains("工程实践-{姓名}-{班级}-{管理员提供的秘钥}"));Eq(false,text.Contains("PRIVATE_"));
+            rule.KeyMode="名单";Eq(true,SubjectInstructions.Generate(rule).Contains("保留开头的 0"));
+            rule.Mode="关键词";Eq(false,SubjectInstructions.Generate(rule).Contains("{姓名}"));
+            rule.Keywords=["工程实践","报告"];rule.MatchAll=true;
+            var plain=SubjectInstructions.Generate(rule);Eq(true,plain.Contains("工程实践 报告"));Eq(false,plain.Contains("姓名"));Eq(false,plain.Contains("学号"));
+            Eq(Validation.Success,RuleValidator.Match("工程实践 报告",rule));
+            rule.Mode="结构校验";rule.Fields=["项目编号"];rule.KeyMode="固定秘钥";
+            var custom=SubjectInstructions.Generate(rule);Eq(true,custom.Contains("工程实践 报告-{项目编号}-{管理员提供的秘钥}"));Eq(false,custom.Contains("{姓名}"));
+            Eq(Validation.Success,RuleValidator.Match("工程实践 报告-P001-PRIVATE_KEY_123",rule));
+            rule.Keywords=[];bool rejected=false;try{SubjectInstructions.Generate(rule);}catch(ArgumentException){rejected=true;}Eq(true,rejected);
             return Task.CompletedTask;
         });
         await Test("keyword scopes combine across subject body and filenames",()=>

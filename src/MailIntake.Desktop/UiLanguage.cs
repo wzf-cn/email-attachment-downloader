@@ -81,6 +81,9 @@ internal static class UiLanguage
 本次邮件主题|Submission topic
 主题填写示例|Example topic
 例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。|Example: Practice report. Name and ID placeholders are added automatically when required.
+请先填写触发关键词。|Enter keywords first.
+关键词不能包含换行。|Keywords cannot contain line breaks.
+请填写主题项目和分隔符；关键词不要包含字段分隔符。|Set the required fields and separator. Keywords must not contain the field separator.
 发给提交者|For senders
 一键生成主题说明|Generate subject instructions
 主题填写说明|Subject instructions
