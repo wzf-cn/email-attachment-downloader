@@ -14,7 +14,18 @@ internal static class LocalSettings
     public static string Database => Path.Combine(Root,"records.sqlite3");
     public static string Encrypt(string plain) => Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(plain),null,DataProtectionScope.CurrentUser));
     public static string Decrypt(string encrypted) => Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(encrypted),null,DataProtectionScope.CurrentUser));
-    public static Settings Load() => File.Exists(Config)?JsonSerializer.Deserialize<Settings>(File.ReadAllText(Config))??new():new();
+    public static Settings Load()
+    {
+        if(!File.Exists(Config))return new();
+        string json=File.ReadAllText(Config);var settings=JsonSerializer.Deserialize<Settings>(json)??new();
+        using var doc=JsonDocument.Parse(json);
+        if(doc.RootElement.TryGetProperty("Accounts",out var accounts))
+            for(int a=0;a<settings.Accounts.Count;a++)
+                if(accounts[a].TryGetProperty("Rules",out var rules))
+                    for(int r=0;r<settings.Accounts[a].Rules.Count;r++)
+                        if(!rules[r].TryGetProperty("IntervalMinutes",out _))settings.Accounts[a].Rules[r].IntervalMinutes=Math.Clamp(settings.IntervalMinutes,1,1440);
+        return settings;
+    }
     public static void Save(Settings settings)
     {
         Directory.CreateDirectory(Root);

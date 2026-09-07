@@ -14,6 +14,7 @@ public sealed class StateStore
         using var command=db.CreateCommand();
         command.CommandText="""
             PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS scheduled_messages (id TEXT PRIMARY KEY);
             CREATE TABLE IF NOT EXISTS handled (id TEXT PRIMARY KEY, status TEXT, sender TEXT, account TEXT, time TEXT);
             CREATE TABLE IF NOT EXISTS senders (sender TEXT PRIMARY KEY, errors INTEGER NOT NULL, blocked INTEGER NOT NULL, updated TEXT);
             CREATE TABLE IF NOT EXISTS replies (id TEXT PRIMARY KEY, status TEXT, sender TEXT, account TEXT, kind TEXT, messageId TEXT, time TEXT);
@@ -38,6 +39,12 @@ public sealed class StateStore
         for(int i=0;i<args.Length;i++) c.Parameters.AddWithValue("$p"+i,args[i]??DBNull.Value);
         return c;
     }
+    public void StopScheduled(string id)
+    {using var db=Open();using var c=Cmd(db,"DELETE FROM scheduled_messages WHERE id=$p0",id);c.ExecuteNonQuery();}
+    public bool IsScheduled(string id)
+    {using var db=Open();using var c=Cmd(db,"SELECT 1 FROM scheduled_messages WHERE id=$p0",id);return c.ExecuteScalar()!=null;}
+    public void TrackScheduled(string id)
+    {using var db=Open();using var c=Cmd(db,"INSERT OR IGNORE INTO scheduled_messages VALUES ($p0)",id);c.ExecuteNonQuery();}
     public bool IsHandled(string id)
     {
         using var db=Open(); using var c=Cmd(db,"SELECT 1 FROM handled WHERE id=$p0",id); return c.ExecuteScalar()!=null;

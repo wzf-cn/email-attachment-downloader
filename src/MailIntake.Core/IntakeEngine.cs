@@ -20,19 +20,30 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         if(new[]{"bulk","list","junk"}.Contains((m.Headers["Precedence"]??"").ToLowerInvariant())) return false;
         return !new[]{"no-reply","noreply","mailer-daemon","postmaster"}.Contains(incoming.Sender.Split('@')[0].ToLowerInvariant());
     }
-    public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token,bool reexport=false)
+    public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token,bool reexport=false,ISet<string>? dueRules=null)
     {
         token.ThrowIfCancellationRequested();
         string from=incoming.Sender.ToLowerInvariant();
-        if(!reexport && store.IsHandled(incoming.Id)) return false;
-        if(store.IsBlocked(from)) { if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
+        bool handled=store.IsHandled(incoming.Id);
+        if(!reexport && handled && (dueRules is null || !store.IsScheduled(incoming.Id))) return false;
+        if(store.IsBlocked(from)) { if(handled&&!reexport)return false; if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
         var candidates=account.Rules.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r))).Where(x=>x.Result!=Validation.Ignore).ToList();
         if(candidates.Count==0) return false;
+        var allCandidates=candidates;
+        if(dueRules!=null)
+        {
+            bool anyValid=candidates.Any(x=>x.Result==Validation.Success);
+            candidates=candidates.Where(x=>dueRules.Contains(x.Rule.Id)&&(!anyValid||x.Result==Validation.Success)).ToList();
+            if(candidates.Count==0)return false;
+            if(handled&&!reexport)candidates=candidates.Where(x=>x.Result==Validation.Success&&!store.HasArchive(Constants.Hash(incoming.Id+"|"+Path.GetFullPath(x.Rule.Output).ToLowerInvariant()))).ToList();
+            if(candidates.Count==0)return false;
+            if(!reexport)store.TrackScheduled(incoming.Id);
+        }
         var selected=candidates.FirstOrDefault(x=>x.Result==Validation.Success);
         if(selected.Rule is null) selected=candidates[0];
         bool valid=selected.Result==Validation.Success;
         if(reexport&&!valid)return false;
-        bool canReply=!reexport&&CanReply(incoming,settings.Accounts.Select(a=>a.Address.ToLowerInvariant()).ToHashSet());
+        bool canReply=!reexport&&!handled&&CanReply(incoming,settings.Accounts.Select(a=>a.Address.ToLowerInvariant()).ToHashSet());
         bool justBlocked=false;
         bool skippedLarge=false;
         if(!valid)
@@ -47,6 +58,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
             if(incoming.Size>settings.MaxMessageMb*1024L*1024L)
             {
                 store.Mark(incoming.Id,"Oversize",from,account.Address);
+                store.StopScheduled(incoming.Id);
                 store.Event("大小限制",from,account.Address,$"邮件超过 {settings.MaxMessageMb} MB，未下载：{incoming.Subject}");
                 log("异常：邮件超过大小上限，已记录，请管理员核对。"); return true;
             }
@@ -60,7 +72,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 if(!reexport && store.HasArchive(recordId)) continue;
                 // Rules targeting the same directory contribute the union of their export choices.
                 var effective=JsonSerializer.Deserialize<MailRule>(JsonSerializer.Serialize(match.Rule))!;
-                var same=candidates.Where(x=>x.Result==Validation.Success&&Path.GetFullPath(x.Rule.Output).Equals(output,StringComparison.OrdinalIgnoreCase)).Select(x=>x.Rule).ToList();
+                var same=allCandidates.Where(x=>x.Result==Validation.Success&&Path.GetFullPath(x.Rule.Output).Equals(output,StringComparison.OrdinalIgnoreCase)).Select(x=>x.Rule).ToList();
                 effective.DownloadBody=same.Any(r=>r.DownloadBody);
                 effective.DownloadAttachments=same.Any(r=>r.DownloadAttachments);
                 effective.SaveOriginal=same.Any(r=>r.SaveOriginal);

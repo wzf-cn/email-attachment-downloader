@@ -11,10 +11,8 @@ public static class RuleValidator
         var hits = words.Select(w => !string.IsNullOrWhiteSpace(w) && subject.Contains(w,StringComparison.OrdinalIgnoreCase));
         if (rule.Mode == "关键词") return (rule.MatchAll ? hits.All(x=>x) : hits.Any(x=>x)) ? Validation.Success : Validation.Ignore;
         if (!hits.Any(x=>x)) return Validation.Ignore;
-        if (!subject.StartsWith(rule.Prefix,StringComparison.Ordinal)) return Validation.Structure;
-        var tail = subject[rule.Prefix.Length..];
-        if (string.IsNullOrEmpty(rule.Separator) || !tail.StartsWith(rule.Separator,StringComparison.Ordinal)) return Validation.Structure;
-        var parts = tail[rule.Separator.Length..].Split(rule.Separator,StringSplitOptions.None);
+        if (string.IsNullOrEmpty(rule.Separator)) return Validation.Structure;
+        var parts = subject.Split(rule.Separator,StringSplitOptions.None).Skip(1).ToArray();
         int n = rule.Fields.Count;
         if (parts.Length == n) return parts.All(p=>!string.IsNullOrWhiteSpace(p)) ? Validation.MissingKey : Validation.Structure;
         if (parts.Length != n+1 || parts.Take(n).Any(string.IsNullOrWhiteSpace)) return Validation.Structure;
@@ -31,7 +29,9 @@ public static class RuleValidator
 
     public static void Check(MailRule rule)
     {
+        if(rule.IntervalMinutes<1||rule.IntervalMinutes>1440)throw new ArgumentException("检查频率必须为 1 到 1440 分钟。");
         if(rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)throw new ArgumentException("单个附件上限必须为 1 到 500 MB。");
+        if(rule.Keywords.Count==0&&string.IsNullOrWhiteSpace(rule.Prefix))throw new ArgumentException("至少填写一个关键词。");
         if (string.IsNullOrWhiteSpace(rule.Name)) throw new ArgumentException("请填写规则名称。");
         if (string.IsNullOrWhiteSpace(rule.Output) || !Path.IsPathFullyQualified(rule.Output)) throw new ArgumentException("请为此组规则选择完整下载目录。");
         if (rule.Mode == "关键词")
@@ -40,7 +40,7 @@ public static class RuleValidator
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(rule.Prefix) || string.IsNullOrEmpty(rule.Separator) || rule.Fields.Count==0) throw new ArgumentException("固定开头、分隔符和中间字段不能为空。");
+            if (string.IsNullOrEmpty(rule.Separator) || rule.Fields.Count==0) throw new ArgumentException("分隔符和主题项目不能为空。");
             if (rule.KeyMode == "名单" && rule.Roster.Count == 0) throw new ArgumentException("请导入学号或秘钥名单。");
             if (rule.KeyMode != "名单" && (string.IsNullOrEmpty(rule.SubjectKey) || rule.SubjectKey.Contains(rule.Separator))) throw new ArgumentException("固定秘钥不能为空，且不能含分隔符。");
         }

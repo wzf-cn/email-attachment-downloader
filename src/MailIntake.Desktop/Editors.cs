@@ -105,13 +105,13 @@ internal sealed class RuleEditor : EditorForm
     {
         Result=old??new();var source=Result;Height=840;
         Section("触发与主题");
-        if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Text="下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和固定开头，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。"});
+        if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Text="下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和检查频率，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。"});
 
         var name=TextField("规则名称",source.Name);
         var mode=Choice("模式",source.Mode,"结构校验","关键词");
-        var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords));
+        var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords.Count>0?source.Keywords:string.IsNullOrWhiteSpace(source.Prefix)?[]:[source.Prefix]));
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
-        var prefix=TextField("固定开头",source.Prefix);
+        var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
         var separator=TextField("字段分隔符",source.Separator);
         var fields=TextField("主题包含哪些项目",string.Join(',',source.Fields));
         Field("填写示例",new Label{AutoSize=true,Text="填“姓名”表示发件人须在主题中写自己的姓名。例如：工程实践-张三-00123。若还要求班级，填“姓名,班级”。学号在下方“结尾校验”中设置。"});
@@ -125,12 +125,12 @@ internal sealed class RuleEditor : EditorForm
         void UpdateSubject()
         {
             bool structured=mode.Text=="结构校验";
-            foreach(var control in new Control[]{prefix,separator,fields,keyMode})control.Enabled=structured;
+            foreach(var control in new Control[]{separator,fields,keyMode})control.Enabled=structured;
             subjectKey.Enabled=structured&&keyMode.Text=="固定秘钥";rosterButton.Enabled=structured&&keyMode.Text=="名单";matchAll.Enabled=!structured;
-            preview.Text=structured?string.Join(separator.Text,new[]{prefix.Text}.Concat(fields.Text.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries).Select(x=>x.Trim()=="姓名"?"张三":"〈"+x.Trim()+"〉")).Append(keyMode.Text=="名单"?"00123":"〈秘钥〉")):"命中关键词即可处理，无需校验主题结构。";
+            preview.Text=structured?string.Join(separator.Text,new[]{"〈主题内容〉"}.Concat(fields.Text.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries).Select(x=>x.Trim()=="姓名"?"张三":"〈"+x.Trim()+"〉")).Append(keyMode.Text=="名单"?"00123":"〈秘钥〉")):"命中关键词即可处理，无需校验主题结构。";
         }
         mode.SelectedIndexChanged+=(_,_)=>UpdateSubject();keyMode.SelectedIndexChanged+=(_,_)=>UpdateSubject();
-        prefix.TextChanged+=(_,_)=>UpdateSubject();separator.TextChanged+=(_,_)=>UpdateSubject();fields.TextChanged+=(_,_)=>UpdateSubject();UpdateSubject();
+        separator.TextChanged+=(_,_)=>UpdateSubject();fields.TextChanged+=(_,_)=>UpdateSubject();UpdateSubject();
         Section("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
@@ -151,7 +151,7 @@ internal sealed class RuleEditor : EditorForm
         var sample=TextField("测试主题（不发送邮件）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,Prefix=prefix.Text,Separator=separator.Text,Fields=Split(fields.Text),
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
             KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule);MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});

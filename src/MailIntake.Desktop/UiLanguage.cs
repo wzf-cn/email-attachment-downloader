@@ -73,6 +73,10 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+检查频率|Check frequency
+检查频率（分钟）|Check interval (minutes)
+检查频率必须为 1 到 1440 分钟。|Check interval must be between 1 and 1440 minutes.
+分隔符和主题项目不能为空。|Separator and subject fields are required.
 启动时检查软件更新|Check for software updates at startup
 软件更新|Software updates
 检查软件更新|Check for updates
@@ -297,7 +301,7 @@ PayPal 赞助|Donate via PayPal
 请填写成功回复内容。|Enter the success reply body.
 名单没有有效数据。|The roster contains no valid records.
 模板已套用|Template applied
-下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和固定开头，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。|Reusable settings are filled in. Review the rule name, keywords and prefix, choose a folder, and import a roster or enter a key. Update any task names in the reply body.
+下载方式、大小限制、主题结构等已填好。请核对本次规则名称、关键词和检查频率，选择下载目录，并导入本次名单或填写秘钥。回复内容如有任务名称，也请相应修改。|Reusable settings are filled in. Review the rule name, keywords and check interval, choose a folder, and import a roster or enter a key. Update any task names in the reply body.
 错误统一回复：主题的格式或内容不符合要求。默认连续 3 次错误后通知联系管理员并停收；次数可在“运行设置”调整。完整主题校验成功后清零，已停收须管理员重置。|Invalid subjects receive a generic rejection. After 3 consecutive errors by default, notify and block the sender. Change the threshold in Settings. A valid subject clears the count; blocked senders require an administrator reset.
 已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。|Saved and started. Matching messages since the start date will also be processed and replied to.
 """;

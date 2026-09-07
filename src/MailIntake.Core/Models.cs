@@ -43,7 +43,8 @@ public sealed class MailRule
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
     public string Mode { get; set; } = "结构校验";
-    public string Prefix { get; set; } = "";
+    public string Prefix { get; set; } = ""; // Legacy import only.
+    public int IntervalMinutes { get; set; } = 5;
     public string Separator { get; set; } = "-";
     public List<string> Fields { get; set; } = ["姓名"];
     public List<string> Keywords { get; set; } = [];

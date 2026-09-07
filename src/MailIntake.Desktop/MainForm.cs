@@ -17,7 +17,7 @@ internal sealed class MainForm : Form
     private readonly DataGridView accounts=Grid(), rules=Grid(), archives=Grid(), replies=Grid(), senders=Grid(), events=Grid();
     private readonly TextBox logs=new(){Multiline=true,ReadOnly=true,Dock=DockStyle.Fill,ScrollBars=ScrollBars.Vertical,BackColor=Color.White,BorderStyle=BorderStyle.None};
     private readonly Label status=new(){Text="尚未开始 · 请先绑定邮箱并设置规则",AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Padding=new Padding(8)};
-    private readonly NumericUpDown interval=new(){Minimum=1,Maximum=1440,Width=75};
+    private readonly RuleSchedule schedule=new();
     private readonly NumericUpDown maxSize=new(){Minimum=1,Maximum=500,Width=75};
     private readonly NumericUpDown errorThreshold=new(){Minimum=1,Maximum=20,Width=75};
     private readonly NumericUpDown maxReplies=new(){Minimum=1,Maximum=10000,Width=75};
@@ -70,11 +70,11 @@ internal sealed class MainForm : Form
         AddPage(tabs,"停收管理",senders,Toolbar(("刷新",RefreshRecords),("重置并恢复接收",ResetSender)));
         AddPage(tabs,"异常与审计",events,Toolbar(("刷新",RefreshRecords),("查看详情",ShowEvent),("导出 CSV",()=>ExportGrid(events,"异常记录"))));
         AddPage(tabs,"运行日志",logs,null);
-        errorThreshold.Value=Math.Clamp(settings.ErrorThreshold,1,20);interval.Value=settings.IntervalMinutes;maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
+        errorThreshold.Value=Math.Clamp(settings.ErrorThreshold,1,20);maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
         var options=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(8,16,8,16)};
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,220));options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         void Option(string label,Control control){int row=options.RowCount++;control.Margin=new Padding(4,12,4,12);options.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,ForeColor=Design.Ink},0,row);options.Controls.Add(control,1,row);}
-        Option("自动检查间隔（分钟）",interval);Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("连续错误几次后停收",errorThreshold);Option("开机启动",autoStart);
+        Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("连续错误几次后停收",errorThreshold);Option("开机启动",autoStart);
         Option("历史邮件",reexport);
         var updates=new CheckBox{Text="启动时检查软件更新",AutoSize=true,Checked=ReleaseUpdates.Enabled};
         updates.CheckedChanged+=(_,_)=>{try{ReleaseUpdates.SetEnabled(updates.Checked);}catch{MessageBox.Show(this,UiLanguage.T("无法保存更新设置。"));}};
@@ -122,7 +122,7 @@ internal sealed class MainForm : Form
         accounts.DataSource=settings.Accounts.Select(a=>new{邮箱=a.Address,协议=a.Protocol,服务器=a.Host,状态=a.Enabled?"启用":"停用",规则数=a.Rules.Count}).ToList();
         if(accounts.Rows.Count>0)accounts.CurrentCell=accounts.Rows[Math.Clamp(selected,0,accounts.Rows.Count-1)].Cells[0];RefreshRules();
     }
-    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,模式=r.Mode,固定开头=r.Prefix,下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
+    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,模式=r.Mode,检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
     private void AddAccount(){using var form=new AccountEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,-1);settings.Accounts.Add(form.Result);RefreshAccounts(settings.Accounts.Count-1);}
     private void EditAccount(){if(SelectedAccount is not {} a)return;int i=AccountIndex;using var form=new AccountEditor(a);if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,i);settings.Accounts[i]=form.Result;RefreshAccounts(i);}
     private void CheckDuplicate(MailAccount a,int except){if(settings.Accounts.Where((_,i)=>i!=except).Any(x=>x.Address.Equals(a.Address,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("该邮箱已绑定。");}
@@ -160,14 +160,15 @@ internal sealed class MainForm : Form
     {
         if(settings.Accounts.Count==0)throw new ArgumentException("请先绑定邮箱。");
         foreach(var a in settings.Accounts)foreach(var r in a.Rules)RuleValidator.Check(r);
-        settings.ErrorThreshold=(int)errorThreshold.Value;settings.IntervalMinutes=(int)interval.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
-        LocalSettings.Save(settings);LocalSettings.Startup(settings.AutoStart);activeSettings=settings.Snapshot();requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;Log(requestedReexport?"本次重新导出：按开始日期扫描，不重复回复，停收限制仍有效。":"已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。");
+        settings.ErrorThreshold=(int)errorThreshold.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
+        LocalSettings.Save(settings);LocalSettings.Startup(settings.AutoStart);activeSettings=settings.Snapshot();schedule.Reset();requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;Log(requestedReexport?"本次重新导出：按开始日期扫描，不重复回复，停收限制仍有效。":"已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。");
     }
-    private void CheckNow(){if(busy){MessageBox.Show(this,"请等待本轮结束后再检查或重新导出。");return;}if(!settings.RunOnLaunch){MessageBox.Show(this,"请先保存设置并开始。");return;}requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;}
+    private void CheckNow(){if(busy){MessageBox.Show(this,"请等待本轮结束后再检查或重新导出。");return;}if(!settings.RunOnLaunch){MessageBox.Show(this,"请先保存设置并开始。");return;}requestedReexport=reexport.Checked;reexport.Checked=false;schedule.Reset();running=true;next=DateTime.MinValue;}
     private bool requestedReexport;
     private void Pause(){running=false;cancellation?.Cancel();settings.RunOnLaunch=false;activeSettings.RunOnLaunch=false;LocalSettings.Save(activeSettings);Log("已暂停。已进入发送阶段的结果可能需人工核实。");}
     private async Task RunCycle()
     {
+        if(!requestedReexport&&!activeSettings.Accounts.Any(a=>a.Enabled&&schedule.Due(a,DateTime.Now).Count>0)){next=DateTime.Now.AddSeconds(10);return;}
         busy=true;cycleAnomalies=0;cancellation=new();var snapshot=activeSettings.Snapshot();int processed=0;
         bool exportAgain=requestedReexport;requestedReexport=false;
         try
@@ -176,23 +177,26 @@ internal sealed class MainForm : Form
             foreach(var account in snapshot.Accounts.Where(a=>a.Enabled&&a.Rules.Count>0))
             {
                 if(cancellation.IsCancellationRequested)break;
+                var due=schedule.Due(account,DateTime.Now,exportAgain);
+                if(due.Count==0)continue;
                 try
                 {
                     await foreach(var incoming in gateway.Scan(account,cancellation.Token))
                     {
-                        if(await engine.ProcessAsync(account,incoming,snapshot,Log,cancellation.Token,exportAgain))processed++;
+                        if(await engine.ProcessAsync(account,incoming,snapshot,Log,cancellation.Token,exportAgain,due))processed++;
                         if(!exportAgain&&processed>=snapshot.MaxPerCycle)break;
                     }
                 }
                 catch(OperationCanceledException){break;}
                 catch(Exception e){store.Event("连接或处理失败","",account.Address,e.GetType().Name+"；请检查配置、网络及回复记录。");Log("异常："+account.Address+"："+e.GetType().Name+"，其他邮箱将继续检查。");}
+                schedule.Complete(account,due,DateTime.Now);
                 if(!exportAgain&&processed>=snapshot.MaxPerCycle)break;
             }
         }
         finally
         {
-            busy=false;cancellation.Dispose();cancellation=null;next=DateTime.Now.AddMinutes(snapshot.IntervalMinutes);RefreshRecords();
-            Log($"本轮处理 {processed} 封；"+(running?"下一次 "+next.ToString("HH:mm:ss"):"已暂停"));
+            busy=false;cancellation.Dispose();cancellation=null;next=DateTime.Now.AddSeconds(10);RefreshRecords();
+            Log($"本轮处理 {processed} 封；"+(running?"各规则按各自频率继续检查":"已暂停"));
             if(cycleAnomalies>0)
             {
                 string summary=$"本轮检查发现 {cycleAnomalies} 条异常提示，请到“异常与审计”查看详情。";

@@ -62,6 +62,28 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("independent rule schedules and manual reset",()=>
+        {
+            var a=new MailAccount();var fast=new MailRule{IntervalMinutes=1};var slow=new MailRule{IntervalMinutes=10};a.Rules=[fast,slow];var schedule=new RuleSchedule();var now=new DateTime(2026,1,1);
+            Eq(2,schedule.Due(a,now).Count);schedule.Complete(a,schedule.Due(a,now),now);
+            Eq(0,schedule.Due(a,now.AddSeconds(59)).Count);Eq(true,schedule.Due(a,now.AddMinutes(1)).SetEquals([fast.Id]));Eq(2,schedule.Due(a,now.AddMinutes(10)).Count);
+            schedule.Reset();Eq(2,schedule.Due(a,now).Count);return Task.CompletedTask;
+        });
+        await Test("slower matching rule archives later without second reply",async()=>
+        {
+            var f=new Fixture();var slow=new MailRule{Name="slow",Mode="关键词",Keywords=["工程实践"],Output=Path.Combine(f.Root,"slow"),IntervalMinutes=10};f.Account.Rules.Add(slow);var mail=f.Mail("scheduled");
+            await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,false,new HashSet<string>{f.Rule.Id});
+            Eq(1,f.Store.Archives().Count);Eq(1,f.Sender.Sent.Count);
+            await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,false,new HashSet<string>{slow.Id});
+            Eq(2,f.Store.Archives().Count);Eq(1,f.Sender.Sent.Count);
+            Eq(false,await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,false,new HashSet<string>{slow.Id}));
+        });
+        await Test("not-yet-due success prevents premature rejection",async()=>
+        {
+            var f=new Fixture();var slow=new MailRule{Name="slow",Mode="关键词",Keywords=["工程实践"],Output=Path.Combine(f.Root,"slow")};f.Account.Rules.Add(slow);var mail=f.Mail("defer-invalid","工程实践-张三-999");
+            Eq(false,await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,false,new HashSet<string>{f.Rule.Id}));Eq(0,f.Sender.Sent.Count);
+            await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,false,new HashSet<string>{slow.Id});Eq(1,f.Sender.Sent.Count);Eq(1,f.Store.Archives().Count);
+        });
         await Test("provider detection uses exact domains and secure protocol defaults",()=>
         {
             Eq("QQ",MailProviders.Find(" user@FOXMAIL.COM ")!.Name);
@@ -149,7 +171,7 @@ sealed class Suite
         await Test("subject parsing and roster/name validation",()=>
         {
             var f=new Fixture();
-            foreach(var entry in new Dictionary<string,Validation>{{"工程实践-张三-00123",Validation.Success},{"工程实践-张三",Validation.MissingKey},{"工程实践-张三-999",Validation.WrongKey},{"工程实践-李四-00123",Validation.Structure},{"实践提交-张三-00123",Validation.Structure},{"无关邮件",Validation.Ignore}})Eq(entry.Value,RuleValidator.Match(entry.Key,f.Rule));
+            foreach(var entry in new Dictionary<string,Validation>{{"工程实践-张三-00123",Validation.Success},{"工程实践-张三",Validation.MissingKey},{"工程实践-张三-999",Validation.WrongKey},{"工程实践-李四-00123",Validation.Structure},{"实践提交-张三-00123",Validation.Success},{"无关邮件",Validation.Ignore}})Eq(entry.Value,RuleValidator.Match(entry.Key,f.Rule));
             f.Rule.KeyMode="固定秘钥";f.Rule.SubjectKey="ABC";Eq(Validation.Success,RuleValidator.Match("工程实践-张三-ABC",f.Rule));return Task.CompletedTask;
         });
         await Test("mandatory destination and CSV leading zero",()=>
