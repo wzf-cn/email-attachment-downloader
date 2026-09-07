@@ -74,6 +74,16 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+本次邮件主题|Submission topic
+主题填写示例|Example topic
+例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。|Example: Practice report. Name and ID placeholders are added automatically when required.
+发给提交者|For senders
+一键生成主题说明|Generate subject instructions
+主题填写说明|Subject instructions
+复制说明|Copy instructions
+已复制|Copied
+可修改下面的说明，再复制发给提交邮件的人。|Edit the instructions below, then copy and share them with senders.
+复制失败，请选中文字后按 Ctrl+C。|Could not copy. Select the text and press Ctrl+C.
 检索主题|Search subject
 检索正文|Search body
 检索附件名|Search attachment names

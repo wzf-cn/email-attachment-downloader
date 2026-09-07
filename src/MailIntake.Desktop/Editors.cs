@@ -125,6 +125,9 @@ internal sealed class RuleEditor : EditorForm
         var roster=new Dictionary<string,string>(source.Roster);
         var rosterButton=Field("批量名单",new ActionButton{Text=$"导入 CSV · 已有 {roster.Count} 条",Height=32});
         rosterButton.Click+=(_,_)=>{using var picker=new OpenFileDialog{Filter="学号名单 CSV|*.csv"};if(picker.ShowDialog(this)!=DialogResult.OK)return;try{var data=RuleValidator.ImportRoster(picker.FileName);roster=data;keyMode.Text="名单";rosterButton.Text=$"导入 CSV · 已有 {roster.Count} 条";}catch(Exception e){MessageBox.Show(this,e.Message,"导入失败");}};
+        var instructionTopic=TextField("本次邮件主题",source.InstructionTopic);
+        Field("主题填写示例",new Label{AutoSize=true,Text="例如：工程实践报告。生成后会自动补上姓名、学号等占位项目。"});
+        var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
         var preview=Field("主题示例",new Label{AutoSize=true,ForeColor=Color.FromArgb(22,100,220)});
         preview.Tag="keep-text";
         void UpdateSubject()
@@ -158,8 +161,9 @@ internal sealed class RuleEditor : EditorForm
         var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,InstructionTopic=instructionTopic.Text.Trim(),Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
             KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        makeInstructions.Click+=(_,_)=>{try{using var dialog=new SubjectInstructionsForm(instructionTopic.Text,Read());dialog.ShowDialog(this);}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule,sampleBody.Text,Split(sampleNames.Text));MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});
         var saveTemplate=new ActionButton{Text="保存为模板",Width=130,Height=38};

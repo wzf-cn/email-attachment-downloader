@@ -62,6 +62,15 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("subject instructions explain fields without leaking roster or secret",()=>
+        {
+            var rule=new MailRule{Keywords=["工程实践"],Fields=["姓名","班级"],KeyMode="固定秘钥",SubjectKey="PRIVATE_KEY_123",Roster=new(){{"PRIVATE_ID","PRIVATE_NAME"}}};
+            var text=SubjectInstructions.Generate("工程实践报告",rule);
+            Eq(true,text.Contains("工程实践报告-{姓名}-{班级}-{管理员提供的秘钥}"));Eq(false,text.Contains("PRIVATE_"));
+            rule.KeyMode="名单";Eq(true,SubjectInstructions.Generate("工程实践报告",rule).Contains("保留开头的 0"));
+            rule.Mode="关键词";Eq(false,SubjectInstructions.Generate("工程实践报告",rule).Contains("{姓名}"));
+            return Task.CompletedTask;
+        });
         await Test("keyword scopes combine across subject body and filenames",()=>
         {
             var rule=new MailRule{Mode="关键词",Keywords=["报告","FINAL"],MatchAll=true,SearchSubject=true,SearchAttachmentNames=true};

@@ -19,6 +19,8 @@ internal sealed class ActionButton : AntdUI.Button
         if(UiLanguage.English)description=label switch
         {
             "检查软件更新"=>"Check GitHub and Gitee for a newer stable release. No files are replaced automatically.",
+            "一键生成主题说明"=>"Generate editable instructions from this topic and rule; no messages are sent.",
+            "复制说明"=>"Copy the instructions to your clipboard to share with senders.",
             "清空检索"=>"Clear the search and show all archive records.",
             "测试连接"=>"Test incoming and outgoing sign-in without sending email.",
             "保存并开始"=>"Save settings and start checking messages, including matching mail since the start date.",
@@ -44,6 +46,8 @@ internal static class ButtonHelp
 {
     public static string Describe(string text)=>text switch
     {
+        "一键生成主题说明"=>"按本次主题与规则生成可编辑、可复制的填写说明，不发送邮件。",
+        "复制说明"=>"将说明复制到剪贴板，便于发给需要提交邮件的人。",
         "清空检索"=>"清空关键词并显示全部归档记录，不删除文件或记录。",
         "检查软件更新"=>"查询 GitHub 和 Gitee 正式发布版本，发现更新后可打开官方页面下载。",
         "邮箱与规则"=>"管理绑定的邮箱，以及每个邮箱的收件规则。",
