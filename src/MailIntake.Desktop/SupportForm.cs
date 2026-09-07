@@ -11,6 +11,7 @@ internal sealed class SupportForm : Form
         ClientSize=sponsor?new Size(790,560):new Size(520,300);MinimumSize=Size;
         StartPosition=FormStartPosition.CenterParent;Font=new Font("Microsoft YaHei UI",10);
         BackColor=Color.White;Padding=new Padding(24);ShowInTaskbar=false;
+        if(!sponsor){BuildStarWindow();return;}
         var content=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true};
         Controls.Add(content);
         void Note(string text,int height)=>content.Controls.Add(new Label{Text=text,Width=sponsor?720:450,Height=height,ForeColor=Design.Muted,Margin=new Padding(0,8,0,12)});
@@ -57,6 +58,26 @@ internal sealed class SupportForm : Form
         }
         var close=new ActionButton{Text="关闭",DialogResult=DialogResult.Cancel};
         content.Controls.Add(close);CancelButton=close;
+    }
+
+    private void BuildStarWindow()
+    {
+        ClientSize=new Size(560,330);MinimumSize=Size;MaximumSize=Size;MaximizeBox=false;
+        var layout=new Panel{Dock=DockStyle.Fill};Controls.Add(layout);
+        var title=new Label{Text="支持开源项目",Location=new Point(0,0),Size=new Size(512,42),Font=new Font(Font.FontFamily,17,FontStyle.Bold),ForeColor=Design.Ink};
+        var note=new Label{Text="选择一个平台，登录后点击项目页面上的 Star。",Location=new Point(0,50),Size=new Size(512,48),ForeColor=Design.Muted};
+        layout.Controls.Add(title);layout.Controls.Add(note);
+        const string star="<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path fill='currentColor' d='m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z'/></svg>";
+        void Platform(string text,string address,int x,Color color)
+        {
+            var button=new ActionButton{Text=text,Location=new Point(x,110),Size=new Size(248,66),MinimumSize=new Size(248,66),MaximumSize=new Size(248,66),IconSvg=star,IconSize=new Size(20,20),DefaultBack=color,DefaultBorderColor=color,ForeColor=Color.White,Radius=10};
+            button.Click+=(_,_)=>OpenLink(address);layout.Controls.Add(button);
+        }
+        Platform("GitHub 点 Star","https://github.com/wzf-cn/email-attachment-downloader",0,Color.FromArgb(36,41,47));
+        Platform("Gitee 点 Star","https://gitee.com/wzFeel/email-attachment-downloader",264,Color.FromArgb(199,29,35));
+        var thanks=new Label{Text="感谢你的支持",AutoSize=true,Location=new Point(0,238),ForeColor=Design.Muted};layout.Controls.Add(thanks);
+        var close=new ActionButton{Text="关闭",DialogResult=DialogResult.Cancel,Location=new Point(400,224),Size=new Size(112,38)};
+        layout.Controls.Add(close);CancelButton=close;
     }
 
     private void AddLink(Control parent,string text,string address)
