@@ -67,7 +67,7 @@ internal sealed class SupportForm : Form
         var title=new Label{Text="支持开源项目",Location=new Point(0,0),Size=new Size(512,42),Font=new Font(Font.FontFamily,17,FontStyle.Bold),ForeColor=Design.Ink};
         var note=new Label{Text="选择一个平台，登录后点击项目页面上的 Star。",Location=new Point(0,50),Size=new Size(512,48),ForeColor=Design.Muted};
         layout.Controls.Add(title);layout.Controls.Add(note);
-        const string star="<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path fill='currentColor' d='m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z'/></svg>";
+        const string star="<svg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'><path fill='#ffffff' d='m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z'/></svg>";
         void Platform(string text,string address,int x,Color color)
         {
             var button=new ActionButton{Text=text,Location=new Point(x,110),Size=new Size(248,66),MinimumSize=new Size(248,66),MaximumSize=new Size(248,66),IconSvg=star,IconSize=new Size(20,20),DefaultBack=color,DefaultBorderColor=color,ForeColor=Color.White,Radius=10};

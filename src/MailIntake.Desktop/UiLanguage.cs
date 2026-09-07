@@ -74,8 +74,8 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
-支持开源项目|Support this open-source project
-选择一个平台，登录后点击项目页面上的 Star。|Choose a platform, sign in, then click Star on the project page.
+支持开源项目|Support the project
+选择一个平台，登录后点击项目页面上的 Star。|Sign in to GitHub or Gitee, then click Star.
 感谢你的支持|Thank you for your support
 检索主题、邮箱或规则|Search subject, email or rule
 清空检索|Clear search
