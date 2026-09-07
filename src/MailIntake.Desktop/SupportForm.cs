@@ -39,12 +39,12 @@ internal sealed class SupportForm : Form
                     string imagePath=Path.Combine(folder,file);
                     if(!File.Exists(imagePath))continue;
                     bool wechat=file=="wechat.png";
-                    var card=new Panel{Width=350,Height=340,Margin=new Padding(4,0,8,0),BackColor=Color.White};
+                    var card=new Panel{Width=350,Height=340,Margin=new Padding(4,0,8,0),BackColor=wechat?Color.FromArgb(7,193,96):Color.FromArgb(22,119,255)};
                     // Display only source regions. Never regenerate or alter the payment QR pixels.
                     var qr=new ImageRegion(imagePath,wechat?new Rectangle(425,477,602,602):new Rectangle(250,582,552,552))
-                    {Location=new Point(40,0),Size=new Size(270,270),AccessibleName=label+"收款码",Cursor=Cursors.Hand};
+                    {Location=new Point(40,16),Size=new Size(270,270),AccessibleName=label+"收款码",Cursor=Cursors.Hand};
                     qr.Click+=(_,_)=>OpenLink(imagePath);card.Controls.Add(qr);
-                    var badge=new FlowLayoutPanel{Location=new Point(76,281),Size=new Size(220,38),WrapContents=false};
+                    var badge=new FlowLayoutPanel{Location=new Point(40,286),Size=new Size(270,38),Padding=new Padding(48,2,0,0),BackColor=Color.White,WrapContents=false};
                     badge.Controls.Add(new ImageRegion(imagePath,wechat?new Rectangle(290,1445,220,210):new Rectangle(305,85,145,145))
                     {Size=new Size(30,30),Margin=new Padding(0,0,8,0)});
                     badge.Controls.Add(new Label{Text=wechat?"微信支付":"支付宝支付",AutoSize=true,ForeColor=Design.Ink,Margin=new Padding(0,3,0,0)});
