@@ -63,7 +63,7 @@ internal sealed class MainForm : Form
         Controls.Add(tabs);Controls.Add(bottom);Controls.Add(header);
         accounts.SelectionChanged+=(_,_)=>RefreshRules();
         accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellDoubleClick+=(_,_)=>EditRule();events.CellDoubleClick+=(_,_)=>ShowEvent();
-        RefreshAccounts();RefreshRecords();
+        RefreshAccounts();RefreshRecords();Design.AttachOptionHelp(this);
         var menu=new ContextMenuStrip();menu.Items.Add("显示窗口",null,(_,_)=>ShowWindow());menu.Items.Add("暂停检查",null,(_,_)=>Pause());menu.Items.Add("退出",null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
         FormClosing+=(_,e)=>{if(!exiting&&!smoke){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"邮件接收管理","已转到托盘运行。右键托盘图标可退出。",ToolTipIcon.Info);}};
         timer.Tick+=async(_,_)=>{if(updateExit.WaitOne(0)){ExitApp();return;}if(!exiting&&running&&!busy&&DateTime.Now>=next)await RunCycle();};

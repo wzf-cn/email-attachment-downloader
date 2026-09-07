@@ -16,6 +16,7 @@ internal class EditorForm : Form
         var cancel=new ActionButton{Text="取消",Width=90,Height=38,DialogResult=DialogResult.Cancel};Footer.Controls.Add(cancel);CancelButton=cancel;
     }
     internal PageDeck? Sections {get;private set;}
+    protected override void OnShown(EventArgs e){base.OnShown(e);Design.AttachOptionHelp(this);}
     protected void Section(string title)
     {
         if(Sections is null)
