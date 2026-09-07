@@ -110,6 +110,11 @@ internal sealed class RuleEditor : EditorForm
         var name=TextField("规则名称",source.Name);
         var mode=Choice("模式",source.Mode,"结构校验","关键词");
         var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords.Count>0?source.Keywords:string.IsNullOrWhiteSpace(source.Prefix)?[]:[source.Prefix]));
+        var searchSubject=new CheckBox{Text="检索主题",AutoSize=true,Checked=source.SearchSubject};
+        var searchBody=new CheckBox{Text="检索正文",AutoSize=true,Checked=source.SearchBody};
+        var searchAttachments=new CheckBox{Text="检索附件名",AutoSize=true,Checked=source.SearchAttachmentNames};
+        var scopes=new FlowLayoutPanel{AutoSize=true};scopes.Controls.AddRange([searchSubject,searchBody,searchAttachments]);Field("检索范围",scopes);
+        Field("检索说明",new Label{AutoSize=true,Text="可多选。全部匹配时，每个关键词可出现在不同范围。正文或附件名检索需先接收邮件；不搜索附件内部内容。结构校验仍只校验主题。"});
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
         var separator=TextField("字段分隔符",source.Separator);
@@ -149,11 +154,13 @@ internal sealed class RuleEditor : EditorForm
         Field("错误与停收策略",new Label{AutoSize=true,Text="错误统一回复："+Constants.ErrorReply+"。默认连续 3 次错误后通知联系管理员并停收；次数可在“运行设置”调整。完整主题校验成功后清零，已停收须管理员重置。"});
         Section("测试识别");
         var sample=TextField("测试主题（不发送邮件）","");
+        var sampleBody=TextField("测试正文","",false,3);
+        var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode=mode.Text,Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Separator=separator.Text,Fields=Split(fields.Text),
             KeyMode=keyMode.Text,SubjectKey=subjectKey.Text,Roster=roster,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
-        test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule);MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
+        test.Click+=(_,_)=>{try{var rule=Read();RuleValidator.Check(rule);var result=RuleValidator.Match(sample.Text,rule,sampleBody.Text,Split(sampleNames.Text));MessageBox.Show(this,result switch{Validation.Success=>"完整匹配：下载并按设置回复",Validation.Ignore=>"未命中关键词：忽略，不回复",_=>"校验未通过：统一错误提示（内部原因："+result+"）"},"识别结果");}catch(Exception e){MessageBox.Show(this,e.Message,"请完善规则");}};
         SaveButton(()=>{var rule=Read();RuleValidator.Check(rule);Result=rule;});
         var saveTemplate=new ActionButton{Text="保存为模板",Width=130,Height=38};
         saveTemplate.Click+=(_,_)=>{try{TemplateFiles.Save(this,Read());}catch(Exception e){MessageBox.Show(this,e.Message,"模板保存未完成");}};

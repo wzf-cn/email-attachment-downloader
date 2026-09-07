@@ -74,6 +74,15 @@ internal static class UiLanguage
         finally{item.Updating=false;}
     }
     private const string Catalog="""
+检索主题|Search subject
+检索正文|Search body
+检索附件名|Search attachment names
+检索范围|Search in
+检索说明|Search details
+请至少选择一个检索范围。|Select at least one search scope.
+测试正文|Sample body
+测试附件名（逗号分隔）|Sample filenames (comma-separated)
+可多选。全部匹配时，每个关键词可出现在不同范围。正文或附件名检索需先接收邮件；不搜索附件内部内容。结构校验仍只校验主题。|Select one or more scopes. Required keywords may occur in different scopes. Body and filename searches download the message first; attachment contents are not searched. Structure validation still checks the subject.
 支持开源项目|Support the project
 选择一个平台，登录后点击项目页面上的 Star。|Sign in to GitHub or Gitee, then click Star.
 感谢你的支持|Thank you for your support

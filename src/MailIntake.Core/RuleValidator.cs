@@ -5,10 +5,21 @@ namespace MailIntake.Core;
 
 public static class RuleValidator
 {
-    public static Validation Match(string subject, MailRule rule)
+    public static string HtmlText(string html)
+    {
+        string Strip(string text,string pattern,string replacement)=>System.Text.RegularExpressions.Regex.Replace(text,pattern,replacement,System.Text.RegularExpressions.RegexOptions.IgnoreCase|System.Text.RegularExpressions.RegexOptions.Singleline,TimeSpan.FromSeconds(2));
+        html=Strip(html,@"<(script|style)\b[^>]*>.*?</\1\s*>","");
+        html=Strip(html,@"<(br|p|div|li|tr|h[1-6])\b[^>]*>|</(p|div|li|tr|h[1-6])\s*>","\n");
+        return System.Net.WebUtility.HtmlDecode(Strip(html,@"<[^>]+>",""));
+    }
+    public static Validation Match(string subject, MailRule rule,string body="",IEnumerable<string>? attachmentNames=null)
     {
         var words = rule.Keywords.Count > 0 ? rule.Keywords : [rule.Prefix];
-        var hits = words.Select(w => !string.IsNullOrWhiteSpace(w) && subject.Contains(w,StringComparison.OrdinalIgnoreCase));
+        var sources=new List<string>();
+        if(rule.SearchSubject)sources.Add(subject);
+        if(rule.SearchBody)sources.Add(body);
+        if(rule.SearchAttachmentNames&&attachmentNames!=null)sources.AddRange(attachmentNames);
+        var hits = words.Select(w => !string.IsNullOrWhiteSpace(w) && sources.Any(text=>text.Contains(w,StringComparison.OrdinalIgnoreCase)));
         if (rule.Mode == "关键词") return (rule.MatchAll ? hits.All(x=>x) : hits.Any(x=>x)) ? Validation.Success : Validation.Ignore;
         if (!hits.Any(x=>x)) return Validation.Ignore;
         if (string.IsNullOrEmpty(rule.Separator)) return Validation.Structure;
@@ -29,6 +40,7 @@ public static class RuleValidator
 
     public static void Check(MailRule rule)
     {
+        if(!rule.SearchSubject&&!rule.SearchBody&&!rule.SearchAttachmentNames)throw new ArgumentException("请至少选择一个检索范围。");
         if(rule.IntervalMinutes<1||rule.IntervalMinutes>1440)throw new ArgumentException("检查频率必须为 1 到 1440 分钟。");
         if(rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)throw new ArgumentException("单个附件上限必须为 1 到 500 MB。");
         if(rule.Keywords.Count==0&&string.IsNullOrWhiteSpace(rule.Prefix))throw new ArgumentException("至少填写一个关键词。");

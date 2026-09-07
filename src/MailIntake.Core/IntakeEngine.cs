@@ -27,7 +27,20 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         bool handled=store.IsHandled(incoming.Id);
         if(!reexport && handled && (dueRules is null || !store.IsScheduled(incoming.Id))) return false;
         if(store.IsBlocked(from)) { if(handled&&!reexport)return false; if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
-        var candidates=account.Rules.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r))).Where(x=>x.Result!=Validation.Ignore).ToList();
+        MimeMessage? loaded=null;
+        string searchBody="";string[] searchNames=[];
+        if(account.Rules.Any(r=>r.SearchBody||r.SearchAttachmentNames))
+        {
+            if(incoming.Size>settings.MaxMessageMb*1024L*1024L)
+            {
+                if(!handled){store.Mark(incoming.Id,"Oversize",from,account.Address);store.StopScheduled(incoming.Id);store.Event("大小限制",from,account.Address,"邮件超过大小上限，无法检索正文或附件名："+incoming.Subject);log("异常：邮件超过大小上限，未接收内容进行关键词检索。");}
+                return !handled;
+            }
+            loaded=await incoming.Load(token);
+            searchBody=loaded.TextBody??(loaded.HtmlBody is {} html?RuleValidator.HtmlText(html):"");
+            searchNames=AttachmentExport.Parts(loaded).Select(p=>p.ContentDisposition?.FileName??p.ContentType.Name??"").Where(n=>n.Length>0).ToArray();
+        }
+        var candidates=account.Rules.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r,searchBody,searchNames))).Where(x=>x.Result!=Validation.Ignore).ToList();
         if(candidates.Count==0) return false;
         var allCandidates=candidates;
         if(dueRules!=null)
@@ -62,7 +75,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 store.Event("大小限制",from,account.Address,$"邮件超过 {settings.MaxMessageMb} MB，未下载：{incoming.Subject}");
                 log("异常：邮件超过大小上限，已记录，请管理员核对。"); return true;
             }
-            var message=await incoming.Load(token);
+            var message=loaded??await incoming.Load(token);
             var directories=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach(var match in candidates.Where(x=>x.Result==Validation.Success))
             {

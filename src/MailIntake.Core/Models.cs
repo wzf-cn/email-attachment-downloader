@@ -48,6 +48,9 @@ public sealed class MailRule
     public string Separator { get; set; } = "-";
     public List<string> Fields { get; set; } = ["姓名"];
     public List<string> Keywords { get; set; } = [];
+    public bool SearchSubject { get; set; } = true;
+    public bool SearchBody { get; set; }
+    public bool SearchAttachmentNames { get; set; }
     public bool MatchAll { get; set; }
     public string KeyMode { get; set; } = "名单";
     public string SubjectKey { get; set; } = "";

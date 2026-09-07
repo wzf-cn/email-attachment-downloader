@@ -62,6 +62,29 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("keyword scopes combine across subject body and filenames",()=>
+        {
+            var rule=new MailRule{Mode="关键词",Keywords=["报告","FINAL"],MatchAll=true,SearchSubject=true,SearchAttachmentNames=true};
+            Eq(Validation.Success,RuleValidator.Match("实践报告",rule,"",["final.pdf"]));
+            Eq(Validation.Ignore,RuleValidator.Match("实践报告",rule,"FINAL",[]));
+            rule.SearchBody=true;Eq(Validation.Success,RuleValidator.Match("实践报告",rule,"final",[]));
+            rule.SearchSubject=false;Eq(Validation.Ignore,RuleValidator.Match("实践报告 FINAL",rule,"",[]));
+            rule.Keywords=["报告"];Eq(Validation.Success,RuleValidator.Match("",rule,"正文报告",[]));
+            var restored=System.Text.Json.JsonSerializer.Deserialize<MailRule>("{}")!;Eq(true,restored.SearchSubject);Eq(false,restored.SearchBody);Eq(false,restored.SearchAttachmentNames);
+            return Task.CompletedTask;
+        });
+        await Test("body matching downloads once and preserves header size limit",async()=>
+        {
+            var f=new Fixture();f.Rule.Mode="关键词";f.Rule.Keywords=["正文命中"];f.Rule.SearchSubject=false;f.Rule.SearchBody=true;
+            await f.Process(f.Mail("body-scope","普通主题",text:"正文命中"));Eq(1,f.Loads);Eq(1,f.Store.Archives().Count);Eq(1,f.Sender.Sent.Count);
+            var huge=f.Mail("body-too-large",text:"正文命中") with {Size=100*1024L*1024L};await f.Process(huge);Eq(1,f.Loads);Eq(1,f.Sender.Sent.Count);
+        });
+        await Test("HTML-only body and decoded attachment filename matching",async()=>
+        {
+            var f=new Fixture();f.Rule.Mode="关键词";f.Rule.Keywords=["报告","附件"];f.Rule.MatchAll=true;f.Rule.SearchSubject=false;f.Rule.SearchBody=true;f.Rule.SearchAttachmentNames=true;
+            var mail=f.Mail("html-scope","无关主题",attach:true);var builder=new BodyBuilder{HtmlBody="<p>实践<strong>报告</strong></p>"};builder.Attachments.Add("附件报告.pdf",Encoding.UTF8.GetBytes("sample"));mail.Header.Body=builder.ToMessageBody();
+            await f.Process(mail);Eq(1,f.Loads);Eq(1,f.Store.Archives().Count);
+        });
         await Test("independent rule schedules and manual reset",()=>
         {
             var a=new MailAccount();var fast=new MailRule{IntervalMinutes=1};var slow=new MailRule{IntervalMinutes=10};a.Rules=[fast,slow];var schedule=new RuleSchedule();var now=new DateTime(2026,1,1);

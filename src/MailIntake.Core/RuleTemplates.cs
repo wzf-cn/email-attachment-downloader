@@ -33,7 +33,7 @@ public static class RuleTemplates
         if(!document.RootElement.TryGetProperty("Format",out _)||template is null||template.Format!="MailIntake.RuleTemplate"||template.Version!=1||template.Rule is null)
             throw new ArgumentException("文件不是支持的规则模板。");
         var rule=template.Rule;
-        if(rule.Mode is not ("关键词" or "结构校验")||rule.KeyMode is not ("名单" or "固定秘钥")||rule.Fields is null||rule.Keywords is null||rule.IntervalMinutes<1||rule.IntervalMinutes>1440||rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)
+        if((!rule.SearchSubject&&!rule.SearchBody&&!rule.SearchAttachmentNames)||rule.Mode is not ("关键词" or "结构校验")||rule.KeyMode is not ("名单" or "固定秘钥")||rule.Fields is null||rule.Keywords is null||rule.IntervalMinutes<1||rule.IntervalMinutes>1440||rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)
             throw new ArgumentException("模板中的设置无效。");
         return Instantiate(rule);
     }
