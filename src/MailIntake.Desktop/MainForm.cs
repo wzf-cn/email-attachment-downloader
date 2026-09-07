@@ -19,6 +19,7 @@ internal sealed class MainForm : Form
     private readonly Label status=new(){Text="尚未开始 · 请先绑定邮箱并设置规则",AutoSize=true,ForeColor=Color.FromArgb(36,90,120),Padding=new Padding(8)};
     private readonly NumericUpDown interval=new(){Minimum=1,Maximum=1440,Width=75};
     private readonly NumericUpDown maxSize=new(){Minimum=1,Maximum=500,Width=75};
+    private readonly NumericUpDown errorThreshold=new(){Minimum=1,Maximum=20,Width=75};
     private readonly NumericUpDown maxReplies=new(){Minimum=1,Maximum=10000,Width=75};
     private readonly CheckBox autoStart=new(){Text="登录 Windows 后自动运行",AutoSize=true};
     private readonly CheckBox reexport=new(){Text="忽略之前的记录，重新导出（仅本次，不回复）",AutoSize=true};
@@ -47,11 +48,11 @@ internal sealed class MainForm : Form
         AddPage(tabs,"停收管理",senders,Toolbar(("刷新",RefreshRecords),("重置并恢复接收",ResetSender)));
         AddPage(tabs,"异常与审计",events,Toolbar(("刷新",RefreshRecords),("查看详情",ShowEvent),("导出 CSV",()=>ExportGrid(events,"异常记录"))));
         AddPage(tabs,"运行日志",logs,null);
-        interval.Value=settings.IntervalMinutes;maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
+        errorThreshold.Value=Math.Clamp(settings.ErrorThreshold,1,20);interval.Value=settings.IntervalMinutes;maxSize.Value=settings.MaxMessageMb;maxReplies.Value=settings.MaxRepliesPerHour;autoStart.Checked=settings.AutoStart;
         var options=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(8,16,8,16)};
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,220));options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         void Option(string label,Control control){int row=options.RowCount++;control.Margin=new Padding(4,12,4,12);options.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,ForeColor=Design.Ink},0,row);options.Controls.Add(control,1,row);}
-        Option("自动检查间隔（分钟）",interval);Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("开机启动",autoStart);
+        Option("自动检查间隔（分钟）",interval);Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("连续错误几次后停收",errorThreshold);Option("开机启动",autoStart);
         Option("历史邮件",reexport);
         Option("设置生效",new Label{AutoSize=true,MaximumSize=new Size(570,0),ForeColor=Design.Muted,Text="修改后点击下方“保存并开始”。重新导出仅用于下一次检查，不重复自动回复。邮件上限用于跳过整封大邮件；附件大小在各组规则中设置。"});
         AddPage(tabs,"运行设置",options,null);
@@ -129,7 +130,7 @@ internal sealed class MainForm : Form
     {
         if(settings.Accounts.Count==0)throw new ArgumentException("请先绑定邮箱。");
         foreach(var a in settings.Accounts)foreach(var r in a.Rules)RuleValidator.Check(r);
-        settings.IntervalMinutes=(int)interval.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
+        settings.ErrorThreshold=(int)errorThreshold.Value;settings.IntervalMinutes=(int)interval.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
         LocalSettings.Save(settings);LocalSettings.Startup(settings.AutoStart);activeSettings=settings.Snapshot();requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;Log(requestedReexport?"本次重新导出：按开始日期扫描，不重复回复，停收限制仍有效。":"已保存并开始。开始日期之后的历史匹配邮件也会处理和回复。");
     }
     private void CheckNow(){if(busy){MessageBox.Show(this,"请等待本轮结束后再检查或重新导出。");return;}if(!settings.RunOnLaunch){MessageBox.Show(this,"请先保存设置并开始。");return;}requestedReexport=reexport.Checked;reexport.Checked=false;running=true;next=DateTime.MinValue;}
@@ -175,7 +176,7 @@ internal sealed class MainForm : Form
     {
         archives.DataSource=store.Archives().Select(a=>new{收件邮箱=a.Account,发件邮箱=a.Sender,主题=a.Subject,规则=a.Rule,接收时间=a.ReceivedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")??"未披露（POP3）",保存时间=a.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),目录=a.Directory}).ToList();
         replies.DataSource=store.Replies().Select(r=>new{时间=r.Time,收件邮箱=r.Account,发件邮箱=r.Sender,类型=r.Kind,状态=r.Status switch{"Sent"=>"服务器已接受","Sending"=>"发送中或中断待核实","Uncertain"=>"结果不确定","RateLimited"=>"达到回复限额",_=>r.Status}}).ToList();
-        senders.DataSource=store.Senders().Select(s=>new{发件邮箱=s.Sender,错误次数=s.Errors,接收状态=s.Blocked?"已停收":"正常",更新时间=s.UpdatedAt}).ToList();
+        senders.DataSource=store.Senders().Select(s=>new{发件邮箱=s.Sender,连续错误次数=s.Errors,接收状态=s.Blocked?"已停收":"正常",更新时间=s.UpdatedAt}).ToList();
         events.DataSource=store.Events().Select(e=>new{时间=e.Time,类型=e.Kind,发件邮箱=e.Sender,收件邮箱=e.Account,详情=e.Detail}).ToList();
     }
     private void ResetSender()

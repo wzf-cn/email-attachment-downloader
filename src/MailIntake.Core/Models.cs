@@ -14,6 +14,7 @@ public sealed class Settings
     public bool RunOnLaunch { get; set; }
     public int MaxMessageMb { get; set; } = 30;
     public int MaxPerCycle { get; set; } = 200;
+    public int ErrorThreshold { get; set; } = 3;
     public int MaxRepliesPerHour { get; set; } = 100;
     public Settings Snapshot() => JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(this))!;
 }

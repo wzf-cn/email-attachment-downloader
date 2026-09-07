@@ -20,6 +20,12 @@ public sealed class StateStore
             CREATE TABLE IF NOT EXISTS archives (id TEXT PRIMARY KEY, metadata TEXT);
             CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT, kind TEXT, sender TEXT, account TEXT, detail TEXT);
             CREATE TABLE IF NOT EXISTS fingerprints (id TEXT PRIMARY KEY, subject TEXT, sender TEXT, text TEXT, hashes TEXT, directory TEXT);
+            CREATE TABLE IF NOT EXISTS subject_success (id TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS policy_migrations (name TEXT PRIMARY KEY);
+            BEGIN IMMEDIATE;
+            UPDATE senders SET errors=0 WHERE blocked=0 AND NOT EXISTS (SELECT 1 FROM policy_migrations WHERE name='consecutive-errors-v1');
+            INSERT OR IGNORE INTO policy_migrations VALUES ('consecutive-errors-v1');
+            COMMIT;
             CREATE INDEX IF NOT EXISTS fingerprint_subject ON fingerprints(subject);
             """;
         command.ExecuteNonQuery();
@@ -45,7 +51,7 @@ public sealed class StateStore
     {
         using var db=Open(); using var c=Cmd(db,"INSERT OR IGNORE INTO handled VALUES ($p0,$p1,$p2,$p3,$p4)",id,status,sender,account,Now); c.ExecuteNonQuery();
     }
-    public bool RegisterError(string id,string sender,string account,string reason)
+    public bool RegisterError(string id,string sender,string account,string reason,int threshold=3)
     {
         sender=sender.ToLowerInvariant();
         using var db=Open(); using var tx=db.BeginTransaction();
@@ -55,12 +61,23 @@ public sealed class StateStore
         using var get=Cmd(db,"SELECT errors FROM senders WHERE sender=$p0",sender);
         int count=Convert.ToInt32(get.ExecuteScalar());
         using(var c=Cmd(db,"INSERT INTO handled VALUES ($p0,$p1,$p2,$p3,$p4)",id,reason,sender,account,Now)) c.ExecuteNonQuery();
-        if(count>5)
+        if(count>=Math.Clamp(threshold,1,20))
         {
             using(var c=Cmd(db,"UPDATE senders SET blocked=1 WHERE sender=$p0",sender)) c.ExecuteNonQuery();
-            using(var c=Cmd(db,"INSERT INTO events(time,kind,sender,account,detail) VALUES ($p0,$p1,$p2,$p3,$p4)",Now,"停收",sender,account,"错误主题超过 5 次，已停止处理该发件邮箱所有来信。")) c.ExecuteNonQuery();
+            using(var c=Cmd(db,"INSERT INTO events(time,kind,sender,account,detail) VALUES ($p0,$p1,$p2,$p3,$p4)",Now,"停收",sender,account,$"连续错误主题达到 {Math.Clamp(threshold,1,20)} 次，已停止处理该发件邮箱所有来信。")) c.ExecuteNonQuery();
         }
-        tx.Commit(); return count>5;
+        tx.Commit(); return count>=Math.Clamp(threshold,1,20);
+    }
+    public void RegisterSuccess(string id,string sender)
+    {
+        using var db=Open();using var tx=db.BeginTransaction();
+        using var insert=Cmd(db,"INSERT OR IGNORE INTO subject_success VALUES ($p0)",id);
+        if(insert.ExecuteNonQuery()>0)
+        {
+            using var reset=Cmd(db,"UPDATE senders SET errors=0,updated=$p1 WHERE sender=$p0 AND blocked=0 AND errors>0",sender.ToLowerInvariant(),Now);
+            reset.ExecuteNonQuery();
+        }
+        tx.Commit();
     }
     public void Reset(string sender)
     {

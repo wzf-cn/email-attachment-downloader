@@ -151,12 +151,42 @@ sealed class Suite
         {
             var f=new Fixture();f.Account.Rules.Add(new(){Name="第二组",Mode="关键词",Keywords=["工程实践"],Output=Path.Combine(f.Root,"second")});await f.Process(f.Mail("a2"));Eq(2,f.Store.Archives().Count);Eq(1,f.Sender.Sent.Count);
         });
-        await Test("five generic replies then one admin notice, durable block",async()=>
+        await Test("two generic replies then one admin notice, durable block",async()=>
         {
-            var f=new Fixture();for(int i=1;i<=6;i++)await f.Process(f.Mail("err"+i,"工程实践-张三"));
-            Eq(0,f.Loads);Eq(6,f.Sender.Sent.Count);Eq(true,f.Sender.Sent.Take(5).All(x=>x.Body==Constants.ErrorReply));Eq(Constants.BlockReply,f.Sender.Sent[5].Body);
+            var f=new Fixture();for(int i=1;i<=3;i++)await f.Process(f.Mail("err"+i,"工程实践-张三"));
+            Eq(0,f.Loads);Eq(3,f.Sender.Sent.Count);Eq(true,f.Sender.Sent.Take(2).All(x=>x.Body==Constants.ErrorReply));Eq(Constants.BlockReply,f.Sender.Sent[2].Body);
             f.Store=new(Path.Combine(f.Root,"test.sqlite3"));f.Engine=new(f.Store,f.Sender);
-            await f.Process(f.Mail("valid-blocked"));Eq(0,f.Loads);Eq(6,f.Sender.Sent.Count);Eq(true,f.Store.IsBlocked("student@example.test"));Eq(1,f.Store.Events().Count(x=>x.Kind=="停收"));
+            await f.Process(f.Mail("valid-blocked"));Eq(0,f.Loads);Eq(3,f.Sender.Sent.Count);Eq(true,f.Store.IsBlocked("student@example.test"));Eq(1,f.Store.Events().Count(x=>x.Kind=="停收"));
+        });
+        await Test("success breaks error streak; duplicate checks do not count; custom threshold",async()=>
+        {
+            var f=new Fixture();f.Settings.ErrorThreshold=4;
+            var bad=f.Mail("repeat","工程实践-张三");await f.Process(bad);await f.Process(bad);
+            Eq(1,f.Store.Senders().Single().Errors);
+            await f.Process(f.Mail("success"));Eq(0,f.Store.Senders().Single().Errors);
+            for(int i=0;i<3;i++)await f.Process(f.Mail("again"+i,"工程实践-张三"));
+            Eq(false,f.Store.IsBlocked("student@example.test"));
+            await f.Process(f.Mail("fourth","工程实践-张三"));Eq(true,f.Store.IsBlocked("student@example.test"));
+        });
+        await Test("success retry and historical reexport cannot erase newer errors",async()=>
+        {
+            var f=new Fixture();var good=f.Mail("good");await f.Process(good);
+            await f.Process(f.Mail("bad","工程实践-张三"));
+            await f.Engine.ProcessAsync(f.Account,good,f.Settings,_=>{},CancellationToken.None,true);
+            f.Store.RegisterSuccess(good.Id,"student@example.test");
+            Eq(1,f.Store.Senders().Single().Errors);
+        });
+        await Test("legacy cumulative counters migrate once and keep blocked senders",()=>
+        {
+            var f=new Fixture();f.Store.ImportSender("student@example.test",4,false);f.Store.ImportSender("blocked@example.test",6,true);
+            using(var db=new Microsoft.Data.Sqlite.SqliteConnection("Data Source="+Path.Combine(f.Root,"test.sqlite3")))
+            {db.Open();using var command=db.CreateCommand();command.CommandText="DELETE FROM policy_migrations";command.ExecuteNonQuery();}
+            f.Store=new(Path.Combine(f.Root,"test.sqlite3"));
+            Eq(0,f.Store.Senders().Single(s=>s.Sender=="student@example.test").Errors);Eq(true,f.Store.IsBlocked("blocked@example.test"));
+            f.Store.RegisterError("new-error","student@example.test",f.Account.Address,"test");
+            f.Store=new(Path.Combine(f.Root,"test.sqlite3"));Eq(1,f.Store.Senders().Single(s=>s.Sender=="student@example.test").Errors);
+            Eq(3,System.Text.Json.JsonSerializer.Deserialize<Settings>("{}")!.ErrorThreshold);
+            return Task.CompletedTask;
         });
         await Test("administrator resets one sender; skipped old mail not replayed",async()=>
         {
@@ -165,12 +195,12 @@ sealed class Suite
         });
         await Test("counters shared across receiving mailboxes",async()=>
         {
-            var f=new Fixture();for(int i=0;i<3;i++)await f.Process(f.Mail("one"+i,"工程实践-张三"));
-            f.Account.Address="second@example.test";for(int i=0;i<3;i++)await f.Process(f.Mail("two"+i,"工程实践-张三"));Eq(true,f.Store.IsBlocked("student@example.test"));Eq(Constants.BlockReply,f.Sender.Sent.Last().Body);
+            var f=new Fixture();for(int i=0;i<2;i++)await f.Process(f.Mail("one"+i,"工程实践-张三"));
+            f.Account.Address="second@example.test";for(int i=0;i<1;i++)await f.Process(f.Mail("two"+i,"工程实践-张三"));Eq(true,f.Store.IsBlocked("student@example.test"));Eq(Constants.BlockReply,f.Sender.Sent.Last().Body);
         });
         await Test("uncertain block notice never retried and block retained",async()=>
         {
-            var f=new Fixture();f.Store.ImportSender("student@example.test",5,false);f.Sender.Fail=true;var mail=f.Mail("fail","工程实践-张三");
+            var f=new Fixture();f.Store.ImportSender("student@example.test",2,false);f.Sender.Fail=true;var mail=f.Mail("fail","工程实践-张三");
             try{await f.Process(mail);}catch(IOException){}
             await f.Process(mail);Eq(1,f.Sender.Sent.Count);Eq("Uncertain",f.Store.Replies().Single().Status);Eq(true,f.Store.IsBlocked("student@example.test"));
         });

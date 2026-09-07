@@ -142,7 +142,7 @@ internal sealed class RuleEditor : EditorForm
         var replies=Field("自动回复",new CheckBox{Text="完整匹配时回复；错误主题按统一策略回复",Checked=source.ReplyEnabled});
         var success=TextField("完整匹配回复正文",source.SuccessReply,false,3);
         var detect=Field("异常检查",new CheckBox{Text="检查同主题、不同发件邮箱的正文与附件差异",Checked=source.DetectAnomaly});
-        Field("错误与停收策略",new Label{AutoSize=true,Text="错误统一回复："+Constants.ErrorReply+"。第 6 次错误通知联系管理员并停收，重置后恢复。"});
+        Field("错误与停收策略",new Label{AutoSize=true,Text="错误统一回复："+Constants.ErrorReply+"。默认连续 3 次错误后通知联系管理员并停收；次数可在“运行设置”调整。完整主题校验成功后清零，已停收须管理员重置。"});
         Section("测试识别");
         var sample=TextField("测试主题（不发送邮件）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});

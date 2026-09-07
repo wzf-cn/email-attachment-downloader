@@ -37,12 +37,13 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         bool skippedLarge=false;
         if(!valid)
         {
-            if(canReply) justBlocked=store.RegisterError(incoming.Id,from,account.Address,selected.Result.ToString());
+            if(canReply) justBlocked=store.RegisterError(incoming.Id,from,account.Address,selected.Result.ToString(),settings.ErrorThreshold);
             else store.Mark(incoming.Id,"Suppressed",from,account.Address);
-            if(justBlocked) log("异常："+from+" 错误主题超过 5 次，已停收，需管理员重置。");
+            if(justBlocked) log($"异常：{from} 连续错误主题达到 {Math.Clamp(settings.ErrorThreshold,1,20)} 次，已停收，需管理员重置。");
         }
         else
         {
+            if(!reexport&&canReply)store.RegisterSuccess(incoming.Id,from);
             if(incoming.Size>settings.MaxMessageMb*1024L*1024L)
             {
                 store.Mark(incoming.Id,"Oversize",from,account.Address);
