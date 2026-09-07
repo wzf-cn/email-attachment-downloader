@@ -11,10 +11,14 @@ try {
     & $Dotnet publish src/MailIntake.Desktop/MailIntake.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o artifacts/win-x64
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
     Copy-Item -LiteralPath README.md -Destination artifacts/win-x64/README.md
+    foreach($document in @('CHANGELOG.md','CONTRIBUTING.md','SECURITY.md')){Copy-Item -LiteralPath $document -Destination artifacts/win-x64/}
+    New-Item -ItemType Directory -Path artifacts/win-x64/docs -Force | Out-Null
+    Copy-Item -Path docs/* -Destination artifacts/win-x64/docs -Recurse -Force
     Copy-Item -LiteralPath LICENSE -Destination artifacts/win-x64/LICENSE
     if(Test-Path -LiteralPath support){New-Item -ItemType Directory -Path artifacts/win-x64/support -Force | Out-Null; Copy-Item -Path support/* -Destination artifacts/win-x64/support -Recurse -Force}
     Copy-Item -LiteralPath THIRD_PARTY_NOTICES.md -Destination artifacts/win-x64/THIRD_PARTY_NOTICES.md
-    Copy-Item -LiteralPath licenses -Destination artifacts/win-x64/licenses -Recurse -Force
+    New-Item -ItemType Directory -Path artifacts/win-x64/licenses -Force | Out-Null
+    Copy-Item -Path licenses/* -Destination artifacts/win-x64/licenses -Recurse -Force
     Set-Content -LiteralPath artifacts/win-x64/Update.cmd -Value '@start "" "%~dp0MailIntake.exe" --update' -Encoding ascii
     $releaseRoot = (Resolve-Path artifacts/win-x64).Path
     $updateFiles = @(Get-ChildItem -LiteralPath $releaseRoot -File -Recurse | Where-Object { $_.Name -ne 'update-files.json' } | ForEach-Object { $_.FullName.Substring($releaseRoot.Length + 1) })
