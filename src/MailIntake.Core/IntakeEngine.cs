@@ -27,9 +27,22 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         if(eligible.Count==0)return false;
         string from=incoming.Sender.ToLowerInvariant();
         bool handled=store.IsHandled(incoming.Id);
-        if(!reexport && handled && (dueRules is null || !store.IsScheduled(incoming.Id))) return false;
         if(store.IsBlocked(from)) { if(handled&&!reexport)return false; if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
         MimeMessage? loaded=null;
+        bool repaired=false;
+        if(handled&&!reexport&&incoming.Size<=settings.MaxMessageMb*1024L*1024L)
+        {
+            foreach(var rule in eligible.Where(r=>r.DownloadAttachments&&(dueRules is null||dueRules.Contains(r.Id))))
+            {
+                string id=Constants.Hash(incoming.Id+"|"+Path.GetFullPath(rule.Output).ToLowerInvariant());
+                var record=store.FindArchive(id);
+                if(record is null||record.Attachments.All(File.Exists))continue;
+                loaded??=await incoming.Load(token);
+                int count=await RestoreMissingAttachments(record,loaded,rule,token);
+                if(count>0){repaired=true;log($"已补下载 {count} 个缺失附件：{incoming.Subject}");}
+            }
+        }
+        if(!reexport && handled && (dueRules is null || !store.IsScheduled(incoming.Id))) return repaired;
         string searchBody="";string[] searchNames=[];
         if(eligible.Any(r=>r.SearchBody||r.SearchAttachmentNames))
         {
@@ -38,7 +51,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
                 if(!handled){store.Mark(incoming.Id,"Oversize",from,account.Address);store.StopScheduled(incoming.Id);store.Event("大小限制",from,account.Address,"邮件超过大小上限，无法检索正文或附件名："+incoming.Subject);log("异常：邮件超过大小上限，未接收内容进行关键词检索。");}
                 return !handled;
             }
-            loaded=await incoming.Load(token);
+            loaded??=await incoming.Load(token);
             searchBody=loaded.TextBody??(loaded.HtmlBody is {} html?RuleValidator.HtmlText(html):"");
             searchNames=AttachmentExport.Parts(loaded).Select(p=>p.ContentDisposition?.FileName??p.ContentType.Name??"").Where(n=>n.Length>0).ToArray();
         }
@@ -145,6 +158,36 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         var invalid=Path.GetInvalidFileNameChars();
         value=new string(value.Select(c=>invalid.Contains(c)||char.IsControl(c)?'_':c).ToArray()).Trim(' ','.');
         return string.IsNullOrEmpty(value)?"attachment.bin":value[..Math.Min(value.Length,90)];
+    }
+    private static async Task<int> RestoreMissingAttachments(ArchiveRecord record,MimeMessage message,MailRule rule,CancellationToken token)
+    {
+        string root=Path.GetFullPath(rule.Output).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar;
+        int index=0,count=0;
+        foreach(var attachment in AttachmentExport.Parts(message))
+        {
+            string original=attachment.ContentDisposition?.FileName??attachment.ContentType.Name??"未命名附件";
+            // Export numbering excludes attachments skipped under the original size limit.
+            if(record.SkippedAttachments.Any(s=>s.Name==original))continue;
+            string name=$"attachment_{++index:000}_"+SafeName(attachment.ContentDisposition?.FileName??attachment.ContentType.Name??"attachment.bin");
+            var target=record.Attachments.FirstOrDefault(f=>Path.GetFileName(f)==name||Path.GetFileName(f).EndsWith("_"+name,StringComparison.Ordinal));
+            if(target is null||File.Exists(target))continue;
+            target=Path.GetFullPath(target);
+            if(!target.StartsWith(root,StringComparison.OrdinalIgnoreCase))continue;
+            if(await AttachmentExport.Size(attachment,token)>rule.MaxAttachmentMb*1024L*1024L)continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            string temporary=target+"."+Guid.NewGuid().ToString("N")+".partial";
+            try
+            {
+                await using(var stream=File.Create(temporary))
+                {
+                    if(attachment is MessagePart { Message: not null } embedded)await embedded.Message.WriteToAsync(stream,token);
+                    else if(attachment is MimePart { Content: not null } part)await part.Content.DecodeToAsync(stream,token);
+                }
+                File.Move(temporary,target,false);count++;
+            }
+            finally{if(File.Exists(temporary))File.Delete(temporary);}
+        }
+        return count;
     }
     public static async Task<ArchiveRecord> ArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string recordId,CancellationToken token)
     {

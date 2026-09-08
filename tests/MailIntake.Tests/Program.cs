@@ -62,6 +62,17 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("missing archived attachment is restored without a second reply",async()=>
+        {
+            foreach(bool flat in new[]{false,true})
+            {
+                var f=new Fixture();f.Rule.FlatAttachments=flat;var mail=f.Mail("repair-"+flat,attach:true);
+                await f.Process(mail);var record=f.Store.Archives().Single();var file=record.Attachments.Single();
+                File.Delete(file);await f.Process(mail);
+                Eq(true,File.Exists(file));Eq(1,f.Sender.Sent.Count);Eq(record.Directory,f.Store.Archives().Single().Directory);
+                int loads=f.Loads;await f.Process(mail);Eq(loads,f.Loads);
+            }
+        });
         await Test("rule date range includes end day and overrides account start",()=>
         {
             var account=new MailAccount{Since=new DateTime(2026,9,1)};

@@ -110,6 +110,11 @@ public sealed class StateStore
     }
     public void SetReplyStatus(string id,string status)
     { using var db=Open(); using var c=Cmd(db,"UPDATE replies SET status=$p1 WHERE id=$p0",id,status); c.ExecuteNonQuery(); }
+    public ArchiveRecord? FindArchive(string id)
+    {
+        using var db=Open();using var c=Cmd(db,"SELECT metadata FROM archives WHERE id=$p0",id);
+        return c.ExecuteScalar() is string json?JsonSerializer.Deserialize<ArchiveRecord>(json):null;
+    }
     public bool HasArchive(string id)
     {
         using var db=Open(); using var c=Cmd(db,"SELECT metadata FROM archives WHERE id=$p0",id);
