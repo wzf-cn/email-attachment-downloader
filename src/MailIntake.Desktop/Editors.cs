@@ -55,7 +55,7 @@ internal sealed class AccountEditor : EditorForm
         address.Name="accountAddress";
         var password=TextField("授权码（留空保留原值）","",true);
         var since=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.Since});
-        var enabled=Field("启用",new CheckBox{Checked=source.Enabled,Text="启用此邮箱"});
+        var enabled=Field("启用",new ToggleOption{Checked=source.Enabled,Text="启用此邮箱"});
         Section("收发服务器");
         var protocol=Choice("收信协议",source.Protocol,"IMAP","POP3");
         var host=TextField("收信服务器",source.Host);var port=Number("收信端口",source.Port,1,65535);
@@ -120,40 +120,42 @@ internal sealed class RuleEditor : EditorForm
 
         var name=TextField("规则名称",source.Name);
         var keywords=TextField("触发关键词（逗号分隔）",string.Join(',',source.Keywords.Count>0?source.Keywords:string.IsNullOrWhiteSpace(source.Prefix)?[]:[source.Prefix]));
-        var searchSubject=new CheckBox{Text="检索主题",AutoSize=true,Checked=source.SearchSubject};
-        var searchBody=new CheckBox{Text="检索正文",AutoSize=true,Checked=source.SearchBody};
-        var searchAttachments=new CheckBox{Text="检索附件名",AutoSize=true,Checked=source.SearchAttachmentNames};
+        var searchSubject=new ToggleOption{Text="检索主题",AutoSize=true,Checked=source.SearchSubject};
+        var searchBody=new ToggleOption{Text="检索正文",AutoSize=true,Checked=source.SearchBody};
+        var searchAttachments=new ToggleOption{Text="检索附件名",AutoSize=true,Checked=source.SearchAttachmentNames};
         var scopes=new FlowLayoutPanel{AutoSize=true};scopes.Controls.AddRange([searchSubject,searchBody,searchAttachments]);Field("检索范围",scopes);
         var makeInstructions=Field("发给提交者",new ActionButton{Text="一键生成主题说明",Height=40});
         if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,Text="请核对规则名称、关键词、检查频率及回复内容，并选择本组下载目录。"});
-        var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
+        var matchAll=Field("关键词模式",new ToggleOption{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
         var start=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.StartDate??accountSince??DateTime.Today.AddDays(-30)});
-        var end=Field("结束日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",ShowCheckBox=true,Value=source.EndDate??DateTime.Today,Checked=source.EndDate.HasValue});
-        Field("",new Label{AutoSize=true,Text="包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。"});
+        var end=Field("结束日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.EndDate??DateTime.Today});
+        var limitEnd=Field("",new ToggleOption{Text="设置结束日期",Checked=source.EndDate.HasValue});
+        end.Enabled=limitEnd.Checked;limitEnd.CheckedChanged+=(_,_)=>end.Enabled=limitEnd.Checked;
+        Field("",new Label{AutoSize=true,Text="包含开始和结束当天；关闭结束日期开关表示持续接收。IMAP 按收件日期，POP3 按发送日期。"});
 
         InlineHeading("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);output.AutoScroll=false;
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
-        var downloadBody=Field("下载内容",new CheckBox{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
-        var downloadAttachments=Field("",new CheckBox{Text="下载附件（含云附件链接说明）",Checked=source.DownloadAttachments});
-        var flatAttachments=Field("附件存放方式",new CheckBox{Text="所有附件集中到本组目录的“全部附件”文件夹",Checked=source.FlatAttachments});
+        var downloadBody=Field("下载内容",new ToggleOption{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
+        var downloadAttachments=Field("",new ToggleOption{Text="下载附件（含云附件链接说明）",Checked=source.DownloadAttachments});
+        var flatAttachments=Field("附件存放方式",new ToggleOption{Text="所有附件集中到本组目录的“全部附件”文件夹",Checked=source.FlatAttachments});
         Field("",new Label{AutoSize=true,Text="不勾选：按邮件分别存放。勾选：附件集中存放，正文及记录仍按邮件分开；文件名带主题和唯一编号，避免同名覆盖。"});
         var attachmentLimit=Number("单个附件上限（MB）",source.MaxAttachmentMb,1,500);
         Field("超限处理",new Label{AutoSize=true,Text="默认 20 MB；超过时仅记录文件名、大小和原因，不导出该文件，也不保存包含它的完整 EML。其他附件照常导出。当前需接收邮件后判断附件大小；若要避免接收整封大邮件，请同时设置主界面的邮件上限。"});
-        var saveOriginal=Field("",new CheckBox{Text="保存原始邮件 EML（包含完整正文和随信附件）",Checked=source.SaveOriginal});
+        var saveOriginal=Field("",new ToggleOption{Text="保存原始邮件 EML（包含完整正文和随信附件）",Checked=source.SaveOriginal});
         Field("保存说明",new Label{AutoSize=true,Text="三项可独立选择；全部取消时仅保存发件人、时间等记录。若不想保存正文或附件的任何副本，也请取消原始邮件 EML。修改后需重新导出才能应用到历史邮件。"});
         InlineHeading("回复与安全");
-        var replies=Field("自动回复",new CheckBox{Text="关键词匹配成功后回复",Checked=source.ReplyEnabled});
+        var replies=Field("自动回复",new ToggleOption{Text="关键词匹配成功后回复",Checked=source.ReplyEnabled});
         var success=TextField("完整匹配回复正文",source.SuccessReply,false,3);
-        var detect=Field("异常检查",new CheckBox{Text="检查同主题、不同发件邮箱的正文与附件差异",Checked=source.DetectAnomaly});
+        var detect=Field("异常检查",new ToggleOption{Text="检查同主题、不同发件邮箱的正文与附件差异",Checked=source.DetectAnomaly});
         InlineHeading("测试识别");
         var sample=TextField("测试主题（不发送邮件）","");
         var sampleBody=TextField("测试正文","",false,3);
         var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),StartDate=start.Value.Date,EndDate=end.Checked?end.Value.Date:null,Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),StartDate=start.Value.Date,EndDate=limitEnd.Checked?end.Value.Date:null,Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         name.Name="名称";keywords.Name="关键词";scopes.Name="检索范围";frequency.Name="检查频率";start.Name="开始日期";end.Name="结束日期";output.Name="下载目录";replies.Name="自动回复";
         makeInstructions.Click+=(_,_)=>
         {

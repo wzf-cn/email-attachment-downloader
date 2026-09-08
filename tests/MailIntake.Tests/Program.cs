@@ -62,6 +62,12 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("repair GB encoded bracketed subject without changing foreign text",()=>
+        {
+            Eq("【实践报告】-刘硕-2026-105",SubjectEncoding.Repair("¡¾Êµ¼ù±¨¸æ¡¿-ÁõË¶-2026-105"));
+            foreach(var value in new[]{"Café résumé","【实践报告】-刘硕","¡Hola!","report 2026"})Eq(value,SubjectEncoding.Repair(value));
+            return Task.CompletedTask;
+        });
         await Test("missing archived attachment is restored without a second reply",async()=>
         {
             foreach(bool flat in new[]{false,true})

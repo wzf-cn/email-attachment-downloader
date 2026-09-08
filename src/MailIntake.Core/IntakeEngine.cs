@@ -23,6 +23,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
     public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token,bool reexport=false,ISet<string>? dueRules=null)
     {
         token.ThrowIfCancellationRequested();
+        incoming=incoming with {Subject=SubjectEncoding.Repair(incoming.Subject)};
         var eligible=account.Rules.Where(r=>RuleTimeRange.Contains(r,account,incoming.ReceivedAt??incoming.Header.Date)).ToList();
         if(eligible.Count==0)return false;
         string from=incoming.Sender.ToLowerInvariant();
@@ -191,6 +192,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
     }
     public static async Task<ArchiveRecord> ArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string recordId,CancellationToken token)
     {
+        incoming=incoming with {Subject=SubjectEncoding.Repair(incoming.Subject)};
         string parent=Path.GetFullPath(rule.Output); Directory.CreateDirectory(parent);
         string final=Path.Combine(parent,SafeName(incoming.Subject)+"_"+(incoming.ReceivedAt??message.Date).ToLocalTime().ToString("yyyyMMdd-HHmmss")+"_"+incoming.Id[..8]);
         string staging=Path.Combine(parent,"."+incoming.Id[..24]+"-"+Guid.NewGuid().ToString("N")+".partial");

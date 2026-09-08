@@ -40,7 +40,7 @@ public sealed class MailGateway(Func<string,string> decrypt) : IReplySender
                 if(header.Date.Date<RuleTimeRange.ScanStart(account)) continue;
                 var key=Constants.Hash($"{account.Host}|{account.Address}|POP3|{ids[i]}");
                 int size=await client.GetMessageSizeAsync(index,token);
-                yield return new Incoming(key,header.Subject??"",header.From.Mailboxes.FirstOrDefault()?.Address??"",null,size,header,
+                yield return new Incoming(key,SubjectEncoding.Repair(header.Subject??""),header.From.Mailboxes.FirstOrDefault()?.Address??"",null,size,header,
                     ct=>client.GetMessageAsync(index,ct));
             }
             await client.DisconnectAsync(true,token);
@@ -63,7 +63,7 @@ public sealed class MailGateway(Func<string,string> decrypt) : IReplySender
                     var headers=summary.Headers??await folder.GetHeadersAsync(uid,token);
                     var header=HeaderMessage(headers);
                     var key=Constants.Hash($"{account.Host}|{account.Address}|{account.Folder}|{folder.UidValidity}|{uid.Id}");
-                    yield return new Incoming(key,header.Subject??"",header.From.Mailboxes.FirstOrDefault()?.Address??"",summary.InternalDate,summary.Size??0,header,
+                    yield return new Incoming(key,SubjectEncoding.Repair(header.Subject??""),header.From.Mailboxes.FirstOrDefault()?.Address??"",summary.InternalDate,summary.Size??0,header,
                         ct=>folder.GetMessageAsync(uid,ct));
                 }
             }

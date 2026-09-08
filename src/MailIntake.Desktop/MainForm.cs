@@ -23,8 +23,8 @@ internal sealed class MainForm : Form
     private readonly NumericUpDown maxSize=new(){Minimum=1,Maximum=500,Width=75};
     private readonly NumericUpDown errorThreshold=new(){Minimum=1,Maximum=20,Width=75};
     private readonly NumericUpDown maxReplies=new(){Minimum=1,Maximum=10000,Width=75};
-    private readonly CheckBox autoStart=new(){Text="登录 Windows 后自动运行",AutoSize=true};
-    private readonly CheckBox reexport=new(){Text="忽略之前的记录，重新导出（仅本次，不回复）",AutoSize=true};
+    private readonly ToggleOption autoStart=new(){Text="登录 Windows 后自动运行",AutoSize=true};
+    private readonly ToggleOption reexport=new(){Text="忽略之前的记录，重新导出（仅本次，不回复）",AutoSize=true};
     private CancellationTokenSource? cancellation;
     private bool busy, running, exiting;
     private int cycleAnomalies;
@@ -85,7 +85,7 @@ internal sealed class MainForm : Form
         void Option(string label,Control control){int row=options.RowCount++;control.Margin=new Padding(4,12,4,12);options.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,ForeColor=Design.Ink},0,row);options.Controls.Add(control,1,row);}
         Option("整封邮件上限（MB）",maxSize);Option("每小时最多自动回复（封）",maxReplies);Option("连续错误几次后停收",errorThreshold);Option("开机启动",autoStart);
         Option("历史邮件",reexport);
-        var updates=new CheckBox{Text="启动时检查软件更新",AutoSize=true,Checked=ReleaseUpdates.Enabled};
+        var updates=new ToggleOption{Text="启动时检查软件更新",AutoSize=true,Checked=ReleaseUpdates.Enabled};
         updates.CheckedChanged+=(_,_)=>{try{ReleaseUpdates.SetEnabled(updates.Checked);}catch{MessageBox.Show(this,UiLanguage.T("无法保存更新设置。"));}};
         Option("软件更新",updates);
         var checkUpdate=new ActionButton{Text="检查软件更新",Width=220,MinimumSize=new Size(220,38)};
@@ -141,6 +141,14 @@ internal sealed class MainForm : Form
         rules.BeginEdit(true);((TextBox)rules.EditingControl!).Text="Cancelled";rules.CancelEdit();
         if(SelectedRule!.Name!="Inline verification")throw new Exception("Cancelled edit changed rule");
         SelectedRule!.Name=original;RefreshRules();
+        bool reply=SelectedRule!.ReplyEnabled;
+        var click=typeof(DataGridView).GetMethod("OnCellContentClick",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+        int column=rules.Columns["自动回复"]!.Index;
+        click.Invoke(rules,[new DataGridViewCellEventArgs(column,0)]);
+        if(SelectedRule!.ReplyEnabled==reply)throw new Exception("Reply button did not toggle");
+        click.Invoke(rules,[new DataGridViewCellEventArgs(column,0)]);
+        if(SelectedRule!.ReplyEnabled!=reply)throw new Exception("Reply button did not toggle back");
+
     }
     private bool refreshingRules;
     private void RefreshRules()
@@ -150,7 +158,7 @@ internal sealed class MainForm : Form
         rules.Rows.Clear();
         if(SelectedAccount is not {} account)return;
         foreach(var r in account.Rules)
-            rules.Rows.Add(r.Name,string.Join(",",r.Keywords),ScopeText(r),(r.StartDate??account.Since).ToString("yyyy-MM-dd"),r.EndDate?.ToString("yyyy-MM-dd")??"",r.IntervalMinutes.ToString(),r.Output,r.ReplyEnabled);
+            rules.Rows.Add(r.Name,string.Join(",",r.Keywords),ScopeText(r),(r.StartDate??account.Since).ToString("yyyy-MM-dd"),r.EndDate?.ToString("yyyy-MM-dd")??"",r.IntervalMinutes.ToString(),r.Output,r.ReplyEnabled?"已开启":"已关闭");
         } finally {refreshingRules=false;}
     }
     private static string ScopeText(MailRule r)=>string.Join(" / ",new[]{r.SearchSubject?"主题":null,r.SearchBody?"正文":null,r.SearchAttachmentNames?"附件名":null}.Where(x=>x!=null));
@@ -159,17 +167,33 @@ internal sealed class MainForm : Form
         rules.ReadOnly=false;rules.AutoGenerateColumns=false;rules.EditMode=DataGridViewEditMode.EditOnEnter;
         foreach(string name in new[]{"名称","关键词","检索范围","开始日期","结束日期","检查频率","下载目录","自动回复"})
         {
-            DataGridViewColumn column=name=="检索范围"?new DataGridViewComboBoxColumn():name=="自动回复"?new DataGridViewCheckBoxColumn():new DataGridViewTextBoxColumn();
+            DataGridViewColumn column=name=="检索范围"?new DataGridViewComboBoxColumn():name=="自动回复"?new DataGridViewButtonColumn{FlatStyle=FlatStyle.Flat}:new DataGridViewTextBoxColumn();
+            if(name=="自动回复"){column.ReadOnly=true;column.MinimumWidth=125;}
             column.Name=name;column.HeaderText=UiLanguage.T(name);column.SortMode=DataGridViewColumnSortMode.NotSortable;
             if(column is DataGridViewComboBoxColumn combo)combo.Items.AddRange("主题","正文","附件名","主题 / 正文","主题 / 附件名","正文 / 附件名","主题 / 正文 / 附件名");
             column.ToolTipText=name=="结束日期"?"yyyy-MM-dd；留空表示不限":name=="开始日期"?"yyyy-MM-dd":name=="检查频率"?"分钟，1–1440":"单击修改，Enter 确认，Esc 取消";
             rules.Columns.Add(column);
         }
         rules.EditingControlShowing+=(_,e)=>{if(e.Control is ComboBox combo)combo.DroppedDown=true;};
-        rules.CurrentCellDirtyStateChanged+=(_,_)=>{if(rules.IsCurrentCellDirty&&rules.CurrentCell is DataGridViewCheckBoxCell)rules.CommitEdit(DataGridViewDataErrorContexts.Commit);};
+        rules.CellPainting+=(_,e)=>
+        {
+            if(e.RowIndex<0||e.ColumnIndex<0||rules.Columns[e.ColumnIndex].Name!="自动回复")return;
+            e.PaintBackground(e.ClipBounds,true);
+            bool on=Convert.ToString(e.Value)=="已开启";
+            ToggleOption.DrawSwitch(e.Graphics!,new Rectangle(e.CellBounds.X+10,e.CellBounds.Y+(e.CellBounds.Height-22)/2,38,22),on,true);
+            TextRenderer.DrawText(e.Graphics!,on?"已开启":"已关闭",rules.Font,new Rectangle(e.CellBounds.X+55,e.CellBounds.Y,e.CellBounds.Width-55,e.CellBounds.Height),Design.Ink,TextFormatFlags.VerticalCenter);
+            e.Handled=true;
+        };
+        rules.CellContentClick+=(_,e)=>
+        {
+            if(e.RowIndex<0||e.ColumnIndex<0||rules.Columns[e.ColumnIndex].Name!="自动回复"||SelectedAccount is not {} account)return;
+            var rule=account.Rules[e.RowIndex];
+            rules.Rows[e.RowIndex].Cells[e.ColumnIndex].Value=rule.ReplyEnabled?"已关闭":"已开启";
+        };
+
         rules.CellValidating+=(_,e)=>
         {
-            if(e.RowIndex<0||SelectedAccount is not {} account||e.RowIndex>=account.Rules.Count)return;
+            if(e.RowIndex<0||rules.Columns[e.ColumnIndex].Name=="自动回复"||SelectedAccount is not {} account||e.RowIndex>=account.Rules.Count)return;
             try { var updated=RuleCellEdit.Apply(account.Rules[e.RowIndex],rules.Columns[e.ColumnIndex].Name,Convert.ToString(e.FormattedValue)??"");account.Rules[e.RowIndex]=updated;rules.Rows[e.RowIndex].ErrorText=""; }
             catch(Exception error){e.Cancel=true;rules.Rows[e.RowIndex].ErrorText=error.Message;status.Text=error.Message;}
         };

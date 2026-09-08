@@ -20,7 +20,7 @@ internal static class RuleCellEdit
             case "结束日期":rule.EndDate=string.IsNullOrEmpty(text)||text=="不限"?null:Date();break;
             case "检查频率":rule.IntervalMinutes=int.TryParse(text,out var minutes)?minutes:throw new ArgumentException("检查频率请输入整数分钟。");break;
             case "下载目录":rule.Output=text;break;
-            case "自动回复":rule.ReplyEnabled=bool.Parse(text);break;
+            case "自动回复":rule.ReplyEnabled=text=="已开启";break;
         }
         RuleValidator.Check(rule);return rule;
     }

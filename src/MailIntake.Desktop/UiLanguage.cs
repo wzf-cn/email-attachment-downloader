@@ -91,6 +91,8 @@ internal static class UiLanguage
 不限|No end date
 结束日期不能早于开始日期。|End date cannot be before start date.
 包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。|Both dates are inclusive. Uncheck the end date to keep receiving. IMAP uses received dates; POP3 uses sent dates.
+设置结束日期|Set end date
+包含开始和结束当天；关闭结束日期开关表示持续接收。IMAP 按收件日期，POP3 按发送日期。|Both dates are inclusive. Turn off the end-date switch to keep receiving. IMAP uses received dates; POP3 uses sent dates.
 发给提交者|For senders
 一键生成主题说明|Generate subject instructions
 主题填写说明|Subject instructions
