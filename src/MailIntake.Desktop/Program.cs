@@ -19,7 +19,7 @@ internal static class Program
             if(smoke)
             {
                 AntdUI.Config.Animation=false;
-                form.Show();Application.DoEvents();
+                form.Show();Application.DoEvents();form.VerifyInlineEditing();
                 string? capture=Environment.GetEnvironmentVariable("MAILINTAKE_CAPTURE");
                 void Capture(Form target,string suffix)
                 {

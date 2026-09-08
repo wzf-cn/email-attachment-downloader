@@ -37,7 +37,7 @@ Windows 桌面软件：按主题、正文或附件名中的关键词自动保存
 
 右上角可切换中文 / English，也可提交意见反馈、点 Star 或自愿赞助。
 
-当前版本 **1.5.9**。安装包尚未数字签名，Windows 可能显示安全提示。QQ 云附件只记录链接，需要手动下载；Outlook 的 OAuth 登录暂未支持。自动化测试和界面检查已通过，真实邮箱收发仍需使用者验证。
+当前版本 **1.6.0**。安装包尚未数字签名，Windows 可能显示安全提示。QQ 云附件只记录链接，需要手动下载；Outlook 的 OAuth 登录暂未支持。自动化测试和界面检查已通过，真实邮箱收发仍需使用者验证。
 
 ## 开源许可
 
@@ -46,3 +46,5 @@ Windows 桌面软件：按主题、正文或附件名中的关键词自动保存
 [GitHub](https://github.com/wzf-cn/email-attachment-downloader) · [Gitee](https://gitee.com/wzFeel/email-attachment-downloader)
 
 已归档的附件若在原保存位置缺失，下次检查会尝试补下载，不重复回复。
+
+收件规则列表支持单击单元格直接编辑；Enter 确认、Esc 取消，修改后点击“保存并开始”应用。日期格式为 yyyy-MM-dd，结束日期留空表示不限。

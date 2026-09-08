@@ -102,7 +102,7 @@ internal sealed class MainForm : Form
         Controls.Add(tabs);Controls.Add(bottom);Controls.Add(header);
         rules.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.AllCells;
         accounts.SelectionChanged+=(_,_)=>RefreshRules();
-        accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellClick+=(_,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>=0)EditRuleParameter(rules.Columns[e.ColumnIndex].Name);};events.CellDoubleClick+=(_,_)=>ShowEvent();
+        accounts.CellDoubleClick+=(_,_)=>EditAccount();ConfigureRuleCells();events.CellDoubleClick+=(_,_)=>ShowEvent();
         RefreshAccounts();RefreshRecords();Design.AttachOptionHelp(this);
         var menu=menuForLanguage;menu.Items.Add(UiLanguage.T("显示窗口"),null,(_,_)=>ShowWindow());menu.Items.Add(UiLanguage.T("暂停检查"),null,(_,_)=>Pause());menu.Items.Add(UiLanguage.T("退出"),null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
         FormClosing+=(_,e)=>{if(!exiting&&!smoke){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"邮件接收管理","已转到托盘运行。右键托盘图标可退出。",ToolTipIcon.Info);}};
@@ -132,7 +132,58 @@ internal sealed class MainForm : Form
         accounts.DataSource=settings.Accounts.Select(a=>new{邮箱=a.Address,协议=a.Protocol,服务器=a.Host,状态=a.Enabled?"启用":"停用",规则数=a.Rules.Count}).ToList();
         if(accounts.Rows.Count>0)accounts.CurrentCell=accounts.Rows[Math.Clamp(selected,0,accounts.Rows.Count-1)].Cells[0];RefreshRules();
     }
-    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,关键词=string.Join(",",r.Keywords),检索范围=string.Join(" / ",new[]{r.SearchSubject?"主题":null,r.SearchBody?"正文":null,r.SearchAttachmentNames?"附件名":null}.Where(x=>x!=null)),开始日期=(r.StartDate??SelectedAccount!.Since).ToString("yyyy-MM-dd"),结束日期=r.EndDate?.ToString("yyyy-MM-dd")??"不限",检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
+    internal void VerifyInlineEditing()
+    {
+        rules.CurrentCell=rules.Rows[0].Cells["名称"];rules.BeginEdit(true);
+        if(rules.EditingControl is not TextBox text)throw new Exception("Inline text editor did not open");
+        string original=SelectedRule!.Name;text.Text="Inline verification";rules.NotifyCurrentCellDirty(true);
+        if(!rules.EndEdit()||SelectedRule!.Name!="Inline verification")throw new Exception("Inline edit was not applied: "+status.Text+" / "+SelectedRule!.Name+" / "+rules.Rows[0].ErrorText);
+        rules.BeginEdit(true);((TextBox)rules.EditingControl!).Text="Cancelled";rules.CancelEdit();
+        if(SelectedRule!.Name!="Inline verification")throw new Exception("Cancelled edit changed rule");
+        SelectedRule!.Name=original;RefreshRules();
+    }
+    private bool refreshingRules;
+    private void RefreshRules()
+    {
+        refreshingRules=true;
+        try {
+        rules.Rows.Clear();
+        if(SelectedAccount is not {} account)return;
+        foreach(var r in account.Rules)
+            rules.Rows.Add(r.Name,string.Join(",",r.Keywords),ScopeText(r),(r.StartDate??account.Since).ToString("yyyy-MM-dd"),r.EndDate?.ToString("yyyy-MM-dd")??"",r.IntervalMinutes.ToString(),r.Output,r.ReplyEnabled);
+        } finally {refreshingRules=false;}
+    }
+    private static string ScopeText(MailRule r)=>string.Join(" / ",new[]{r.SearchSubject?"主题":null,r.SearchBody?"正文":null,r.SearchAttachmentNames?"附件名":null}.Where(x=>x!=null));
+    private void ConfigureRuleCells()
+    {
+        rules.ReadOnly=false;rules.AutoGenerateColumns=false;rules.EditMode=DataGridViewEditMode.EditOnEnter;
+        foreach(string name in new[]{"名称","关键词","检索范围","开始日期","结束日期","检查频率","下载目录","自动回复"})
+        {
+            DataGridViewColumn column=name=="检索范围"?new DataGridViewComboBoxColumn():name=="自动回复"?new DataGridViewCheckBoxColumn():new DataGridViewTextBoxColumn();
+            column.Name=name;column.HeaderText=UiLanguage.T(name);column.SortMode=DataGridViewColumnSortMode.NotSortable;
+            if(column is DataGridViewComboBoxColumn combo)combo.Items.AddRange("主题","正文","附件名","主题 / 正文","主题 / 附件名","正文 / 附件名","主题 / 正文 / 附件名");
+            column.ToolTipText=name=="结束日期"?"yyyy-MM-dd；留空表示不限":name=="开始日期"?"yyyy-MM-dd":name=="检查频率"?"分钟，1–1440":"单击修改，Enter 确认，Esc 取消";
+            rules.Columns.Add(column);
+        }
+        rules.EditingControlShowing+=(_,e)=>{if(e.Control is ComboBox combo)combo.DroppedDown=true;};
+        rules.CurrentCellDirtyStateChanged+=(_,_)=>{if(rules.IsCurrentCellDirty&&rules.CurrentCell is DataGridViewCheckBoxCell)rules.CommitEdit(DataGridViewDataErrorContexts.Commit);};
+        rules.CellValidating+=(_,e)=>
+        {
+            if(e.RowIndex<0||SelectedAccount is not {} account||e.RowIndex>=account.Rules.Count)return;
+            try { var updated=RuleCellEdit.Apply(account.Rules[e.RowIndex],rules.Columns[e.ColumnIndex].Name,Convert.ToString(e.FormattedValue)??"");account.Rules[e.RowIndex]=updated;rules.Rows[e.RowIndex].ErrorText=""; }
+            catch(Exception error){e.Cancel=true;rules.Rows[e.RowIndex].ErrorText=error.Message;status.Text=error.Message;}
+        };
+        rules.CellValueChanged+=(_,e)=>
+        {
+            if(refreshingRules||e.RowIndex<0||e.ColumnIndex<0||SelectedAccount is not {} account||e.RowIndex>=account.Rules.Count)return;
+            try { account.Rules[e.RowIndex]=RuleCellEdit.Apply(account.Rules[e.RowIndex],rules.Columns[e.ColumnIndex].Name,Convert.ToString(rules.Rows[e.RowIndex].Cells[e.ColumnIndex].Value)??""); }
+            catch(Exception error){rules.Rows[e.RowIndex].ErrorText=error.Message;status.Text=error.Message;}
+        };
+
+        rules.CellEndEdit+=(_,e)=>{if(string.IsNullOrEmpty(rules.Rows[e.RowIndex].ErrorText))status.Text="修改后请点击“保存并开始”应用。";};
+        rules.DataError+=(_,e)=>{e.ThrowException=false;};
+    }
+
     private void AddAccount(){using var form=new AccountEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,-1);settings.Accounts.Add(form.Result);RefreshAccounts(settings.Accounts.Count-1);}
     private void EditAccount(){if(SelectedAccount is not {} a)return;int i=AccountIndex;using var form=new AccountEditor(a);if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,i);settings.Accounts[i]=form.Result;RefreshAccounts(i);}
     private void CheckDuplicate(MailAccount a,int except){if(settings.Accounts.Where((_,i)=>i!=except).Any(x=>x.Address.Equals(a.Address,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("该邮箱已绑定。");}
@@ -178,6 +229,7 @@ internal sealed class MainForm : Form
     }
     private void SaveStart()
     {
+        if(!rules.EndEdit()||rules.Rows.Cast<DataGridViewRow>().Any(r=>!string.IsNullOrEmpty(r.ErrorText)))throw new ArgumentException("请先修正表格中的参数。");
         if(settings.Accounts.Count==0)throw new ArgumentException("请先绑定邮箱。");
         foreach(var a in settings.Accounts)foreach(var r in a.Rules)RuleValidator.Check(r);
         settings.ErrorThreshold=(int)errorThreshold.Value;settings.MaxMessageMb=(int)maxSize.Value;settings.MaxRepliesPerHour=(int)maxReplies.Value;settings.AutoStart=autoStart.Checked;settings.RunOnLaunch=true;
