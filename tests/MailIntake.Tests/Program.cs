@@ -62,6 +62,24 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("rule date range includes end day and overrides account start",()=>
+        {
+            var account=new MailAccount{Since=new DateTime(2026,9,1)};
+            var rule=System.Text.Json.JsonSerializer.Deserialize<MailRule>("{\"StartDate\":\"2026-08-01\",\"EndDate\":\"2026-08-31\"}")!;
+            account.Rules=[rule];
+            Eq(new DateTime(2026,8,1),RuleTimeRange.ScanStart(account));
+            Eq(true,RuleTimeRange.Contains(rule,account,new DateTimeOffset(2026,8,31,23,59,59,TimeSpan.Zero)));
+            Eq(false,RuleTimeRange.Contains(rule,account,new DateTimeOffset(2026,9,1,0,0,0,TimeSpan.Zero)));
+            Eq(false,RuleTimeRange.Contains(rule,account,new DateTimeOffset(2026,7,31,23,59,59,TimeSpan.Zero)));
+            return Task.CompletedTask;
+        });
+        await Test("out of range body rule never loads or replies",async()=>
+        {
+            var f=new Fixture();f.Rule.StartDate=DateTime.Today.AddDays(1);f.Rule.SearchBody=true;
+            await f.Process(f.Mail("outside-date"));Eq(0,f.Loads);Eq(0,f.Store.Archives().Count);Eq(0,f.Sender.Sent.Count);
+            f.Rule.StartDate=DateTime.Today;f.Rule.EndDate=DateTime.Today;
+            await f.Process(f.Mail("inside-date"));Eq(1,f.Store.Archives().Count);
+        });
         await Test("subject instructions explain fields without leaking roster or secret",()=>
         {
             var rule=new MailRule{Keywords=["工程实践"],Fields=["姓名","班级"],KeyMode="固定秘钥",SubjectKey="PRIVATE_KEY_123",Roster=new(){{"PRIVATE_ID","PRIVATE_NAME"}}};

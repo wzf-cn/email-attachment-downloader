@@ -40,6 +40,7 @@ public static class RuleValidator
 
     public static void Check(MailRule rule)
     {
+        if(rule.StartDate.HasValue&&rule.EndDate.HasValue&&rule.EndDate.Value.Date<rule.StartDate.Value.Date)throw new ArgumentException("结束日期不能早于开始日期。");
         if(!rule.SearchSubject&&!rule.SearchBody&&!rule.SearchAttachmentNames)throw new ArgumentException("请至少选择一个检索范围。");
         if(rule.IntervalMinutes<1||rule.IntervalMinutes>1440)throw new ArgumentException("检查频率必须为 1 到 1440 分钟。");
         if(rule.MaxAttachmentMb<1||rule.MaxAttachmentMb>500)throw new ArgumentException("单个附件上限必须为 1 到 500 MB。");

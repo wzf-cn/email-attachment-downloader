@@ -64,8 +64,8 @@ internal sealed class MainForm : Form
         header.Controls.Add(language);title.BringToFront();
         var tabs=new PageDeck(true);navigation=tabs;
         var split=new SplitContainer{Size=new Size(1000,550),Dock=DockStyle.Fill,Orientation=Orientation.Horizontal,SplitterDistance=230,Panel1MinSize=170,Panel2MinSize=180,SplitterWidth=12,BackColor=Design.Background};
-        split.Panel1.Controls.Add(Design.Card("绑定邮箱 · 选中邮箱后管理其规则",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));
-        split.Panel2.Controls.Add(Design.Card("收件规则 · 每组规则使用独立下载目录",rules,Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder))));
+        split.Panel1.Controls.Add(Design.Card("绑定邮箱",accounts,Toolbar(("绑定邮箱",AddAccount),("编辑邮箱",EditAccount),("移除",RemoveAccount),("测试连接",TestAccount),("导入旧版配置",ImportLegacy))));
+        split.Panel2.Controls.Add(Design.Card("收件规则",rules,Toolbar(("新增规则",AddRule),("从模板新增",AddFromTemplate),("保存为模板",SaveRuleTemplate),("编辑规则",EditRule),("删除规则",RemoveRule),("上移",MoveRule),("打开下载目录",OpenRuleFolder))));
         tabs.AddPage("邮箱与规则",split);
         var archivePanel=new Panel{Dock=DockStyle.Fill};
         var searchRow=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,Padding=new Padding(0,4,0,8)};
@@ -100,8 +100,9 @@ internal sealed class MainForm : Form
         var controls=Toolbar(("保存并开始",SaveStart),("立即检查",CheckNow),("暂停",Pause),("退出软件",ExitApp));controls.Dock=DockStyle.Bottom;
         bottom.Controls.Add(status);bottom.Controls.Add(controls);
         Controls.Add(tabs);Controls.Add(bottom);Controls.Add(header);
+        rules.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.AllCells;
         accounts.SelectionChanged+=(_,_)=>RefreshRules();
-        accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellDoubleClick+=(_,_)=>EditRule();events.CellDoubleClick+=(_,_)=>ShowEvent();
+        accounts.CellDoubleClick+=(_,_)=>EditAccount();rules.CellClick+=(_,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>=0)EditRuleParameter(rules.Columns[e.ColumnIndex].Name);};events.CellDoubleClick+=(_,_)=>ShowEvent();
         RefreshAccounts();RefreshRecords();Design.AttachOptionHelp(this);
         var menu=menuForLanguage;menu.Items.Add(UiLanguage.T("显示窗口"),null,(_,_)=>ShowWindow());menu.Items.Add(UiLanguage.T("暂停检查"),null,(_,_)=>Pause());menu.Items.Add(UiLanguage.T("退出"),null,(_,_)=>ExitApp());tray.ContextMenuStrip=menu;tray.DoubleClick+=(_,_)=>ShowWindow();
         FormClosing+=(_,e)=>{if(!exiting&&!smoke){e.Cancel=true;Hide();tray.ShowBalloonTip(2500,"邮件接收管理","已转到托盘运行。右键托盘图标可退出。",ToolTipIcon.Info);}};
@@ -131,22 +132,32 @@ internal sealed class MainForm : Form
         accounts.DataSource=settings.Accounts.Select(a=>new{邮箱=a.Address,协议=a.Protocol,服务器=a.Host,状态=a.Enabled?"启用":"停用",规则数=a.Rules.Count}).ToList();
         if(accounts.Rows.Count>0)accounts.CurrentCell=accounts.Rows[Math.Clamp(selected,0,accounts.Rows.Count-1)].Cells[0];RefreshRules();
     }
-    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
+    private void RefreshRules()=>rules.DataSource=SelectedAccount?.Rules.Select(r=>new{名称=r.Name,关键词=string.Join(",",r.Keywords),检索范围=string.Join(" / ",new[]{r.SearchSubject?"主题":null,r.SearchBody?"正文":null,r.SearchAttachmentNames?"附件名":null}.Where(x=>x!=null)),开始日期=(r.StartDate??SelectedAccount!.Since).ToString("yyyy-MM-dd"),结束日期=r.EndDate?.ToString("yyyy-MM-dd")??"不限",检查频率=r.IntervalMinutes+" 分钟",下载目录=r.Output,自动回复=r.ReplyEnabled?"启用":"关闭"}).ToList();
     private void AddAccount(){using var form=new AccountEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,-1);settings.Accounts.Add(form.Result);RefreshAccounts(settings.Accounts.Count-1);}
     private void EditAccount(){if(SelectedAccount is not {} a)return;int i=AccountIndex;using var form=new AccountEditor(a);if(form.ShowDialog(this)!=DialogResult.OK)return;CheckDuplicate(form.Result,i);settings.Accounts[i]=form.Result;RefreshAccounts(i);}
     private void CheckDuplicate(MailAccount a,int except){if(settings.Accounts.Where((_,i)=>i!=except).Any(x=>x.Address.Equals(a.Address,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException("该邮箱已绑定。");}
     private void RemoveAccount(){if(SelectedAccount is null)return;settings.Accounts.RemoveAt(AccountIndex);RefreshAccounts();}
-    private void AddRule(){if(SelectedAccount is not {} a){MessageBox.Show(this,"请先绑定并选中邮箱。");return;}using var form=new RuleEditor();if(form.ShowDialog(this)!=DialogResult.OK)return;a.Rules.Add(form.Result);RefreshRules();}
+    private void AddRule(){if(SelectedAccount is not {} a){MessageBox.Show(this,"请先绑定并选中邮箱。");return;}using var form=new RuleEditor(accountSince:a.Since);if(form.ShowDialog(this)!=DialogResult.OK)return;a.Rules.Add(form.Result);RefreshRules();}
     private void SaveRuleTemplate(){if(SelectedRule is not {} rule){MessageBox.Show(this,"请先选中一条规则。");return;}TemplateFiles.Save(this,rule);}
     private void AddFromTemplate()
     {
         if(SelectedAccount is not {} account){MessageBox.Show(this,"请先绑定并选中邮箱。");return;}
         var rule=TemplateFiles.Load(this);if(rule is null)return;
-        using var editor=new RuleEditor(rule,true);
+        using var editor=new RuleEditor(rule,true,account.Since);
         if(editor.ShowDialog(this)!=DialogResult.OK)return;
         account.Rules.Add(editor.Result);RefreshRules();Log("已从模板创建独立规则，请点击“保存并开始”应用。原模板保持不变。");
     }
-    private void EditRule(){if(SelectedAccount is not {} a||SelectedRule is not {} r)return;int i=RuleIndex;using var form=new RuleEditor(r);if(form.ShowDialog(this)!=DialogResult.OK)return;a.Rules[i]=form.Result;RefreshRules();}
+    private void EditRule()=>EditRuleParameter("名称");
+    private void EditRuleParameter(string parameter)
+    {
+        if(SelectedAccount is not {} a||SelectedRule is not {} r)return;
+        int i=RuleIndex;using var form=new RuleEditor(r,accountSince:a.Since);
+        form.Shown+=(_,_)=>form.FocusParameter(parameter);
+        if(form.ShowDialog(this)!=DialogResult.OK)return;
+        a.Rules[i]=form.Result;RefreshRules();
+        if(i<rules.Rows.Count)rules.CurrentCell=rules.Rows[i].Cells[0];
+    }
+
     private void RemoveRule(){if(SelectedAccount is not {} a||SelectedRule is null)return;a.Rules.RemoveAt(RuleIndex);RefreshRules();}
     private void MoveRule(){if(SelectedAccount is not {} a||RuleIndex<1)return;int i=RuleIndex;(a.Rules[i-1],a.Rules[i])=(a.Rules[i],a.Rules[i-1]);RefreshRules();rules.CurrentCell=rules.Rows[i-1].Cells[0];}
     private static void OpenDirectory(string path){if(Directory.Exists(path))Process.Start(new ProcessStartInfo(path){UseShellExecute=true});}

@@ -100,6 +100,12 @@ internal sealed class AccountEditor : EditorForm
 
 internal sealed class RuleEditor : EditorForm
 {
+    internal void FocusParameter(string name)
+    {
+        var control=Controls.Find(name,true).FirstOrDefault();
+        if(control is null)return;
+        Body.ScrollControlIntoView(control);control.Focus();
+    }
     internal void ScrollToEnd()=>Body.AutoScrollPosition=new Point(0,Fields.Height);
     private void InlineHeading(string title)
     {
@@ -108,7 +114,7 @@ internal sealed class RuleEditor : EditorForm
         Fields.Controls.Add(heading,0,row);Fields.SetColumnSpan(heading,2);
     }
     public MailRule Result{get;private set;}
-    public RuleEditor(MailRule? old=null,bool fromTemplate=false):base(fromTemplate?"从模板新增规则":old is null?"新增规则 · 关键词与目录成组保存":"编辑规则")
+    public RuleEditor(MailRule? old=null,bool fromTemplate=false,DateTime? accountSince=null):base(fromTemplate?"从模板新增规则":old is null?"新增规则 · 关键词与目录成组保存":"编辑规则")
     {
         Result=old??new();var source=Result;Height=840;
 
@@ -122,6 +128,10 @@ internal sealed class RuleEditor : EditorForm
         if(fromTemplate)Field("模板已套用",new Label{AutoSize=true,Text="请核对规则名称、关键词、检查频率及回复内容，并选择本组下载目录。"});
         var matchAll=Field("关键词模式",new CheckBox{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
+        var start=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.StartDate??accountSince??DateTime.Today.AddDays(-30)});
+        var end=Field("结束日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",ShowCheckBox=true,Value=source.EndDate??DateTime.Today,Checked=source.EndDate.HasValue});
+        Field("",new Label{AutoSize=true,Text="包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。"});
+
         InlineHeading("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
@@ -143,7 +153,8 @@ internal sealed class RuleEditor : EditorForm
         var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),StartDate=start.Value.Date,EndDate=end.Checked?end.Value.Date:null,Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        name.Name="名称";keywords.Name="关键词";scopes.Name="检索范围";frequency.Name="检查频率";start.Name="开始日期";end.Name="结束日期";output.Name="下载目录";replies.Name="自动回复";
         makeInstructions.Click+=(_,_)=>
         {
             try { using var dialog=new SubjectInstructionsForm(Read());dialog.ShowDialog(this); }

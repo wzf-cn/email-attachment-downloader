@@ -37,7 +37,7 @@ public sealed class MailGateway(Func<string,string> decrypt) : IReplySender
             {
                 int index=i; token.ThrowIfCancellationRequested();
                 var header=HeaderMessage(await client.GetMessageHeadersAsync(index,token));
-                if(header.Date.Date<account.Since.Date) continue;
+                if(header.Date.Date<RuleTimeRange.ScanStart(account)) continue;
                 var key=Constants.Hash($"{account.Host}|{account.Address}|POP3|{ids[i]}");
                 int size=await client.GetMessageSizeAsync(index,token);
                 yield return new Incoming(key,header.Subject??"",header.From.Mailboxes.FirstOrDefault()?.Address??"",null,size,header,
@@ -52,7 +52,7 @@ public sealed class MailGateway(Func<string,string> decrypt) : IReplySender
             await client.AuthenticateAsync(account.Address,decrypt(account.EncryptedPassword),token);
             var folder=await client.GetFolderAsync(account.Folder,token);
             await folder.OpenAsync(FolderAccess.ReadOnly,token);
-            var ids=await folder.SearchAsync(SearchQuery.DeliveredAfter(account.Since.Date),token);
+            var ids=await folder.SearchAsync(SearchQuery.DeliveredAfter(RuleTimeRange.ScanStart(account)),token);
             foreach(var batch in ids.Chunk(100))
             {
                 var summaries=await folder.FetchAsync(batch,MessageSummaryItems.UniqueId|MessageSummaryItems.Envelope|MessageSummaryItems.InternalDate|MessageSummaryItems.Size|MessageSummaryItems.Headers,token);

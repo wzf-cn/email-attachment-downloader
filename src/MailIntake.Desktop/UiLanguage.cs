@@ -86,6 +86,11 @@ internal static class UiLanguage
 请填写主题项目和分隔符；关键词不要包含字段分隔符。|Set the required fields and separator. Keywords must not contain the field separator.
 关键词匹配成功后回复|Reply when keywords match
 请核对规则名称、关键词、检查频率及回复内容，并选择本组下载目录。|Review the rule name, keywords, interval and reply, then choose a download folder.
+开始日期|Start date
+结束日期|End date
+不限|No end date
+结束日期不能早于开始日期。|End date cannot be before start date.
+包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。|Both dates are inclusive. Uncheck the end date to keep receiving. IMAP uses received dates; POP3 uses sent dates.
 发给提交者|For senders
 一键生成主题说明|Generate subject instructions
 主题填写说明|Subject instructions
@@ -151,7 +156,7 @@ internal static class UiLanguage
 保存|Save
 关闭|Close
 绑定邮箱 · 选中邮箱后管理其规则|Accounts · Select an account to manage its rules
-收件规则 · 每组规则使用独立下载目录|Rules · Each group has its own download folder
+收件规则|Mail rules
 尚未开始 · 请先绑定邮箱并设置规则|Not started · Add an account and configure rules
 自动检查间隔（分钟）|Check interval (minutes)
 整封邮件上限（MB）|Message limit (MB)

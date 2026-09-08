@@ -23,13 +23,15 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
     public async Task<bool> ProcessAsync(MailAccount account,Incoming incoming,Settings settings,Action<string> log,CancellationToken token,bool reexport=false,ISet<string>? dueRules=null)
     {
         token.ThrowIfCancellationRequested();
+        var eligible=account.Rules.Where(r=>RuleTimeRange.Contains(r,account,incoming.ReceivedAt??incoming.Header.Date)).ToList();
+        if(eligible.Count==0)return false;
         string from=incoming.Sender.ToLowerInvariant();
         bool handled=store.IsHandled(incoming.Id);
         if(!reexport && handled && (dueRules is null || !store.IsScheduled(incoming.Id))) return false;
         if(store.IsBlocked(from)) { if(handled&&!reexport)return false; if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
         MimeMessage? loaded=null;
         string searchBody="";string[] searchNames=[];
-        if(account.Rules.Any(r=>r.SearchBody||r.SearchAttachmentNames))
+        if(eligible.Any(r=>r.SearchBody||r.SearchAttachmentNames))
         {
             if(incoming.Size>settings.MaxMessageMb*1024L*1024L)
             {
@@ -40,7 +42,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
             searchBody=loaded.TextBody??(loaded.HtmlBody is {} html?RuleValidator.HtmlText(html):"");
             searchNames=AttachmentExport.Parts(loaded).Select(p=>p.ContentDisposition?.FileName??p.ContentType.Name??"").Where(n=>n.Length>0).ToArray();
         }
-        var candidates=account.Rules.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r,searchBody,searchNames))).Where(x=>x.Result!=Validation.Ignore).ToList();
+        var candidates=eligible.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r,searchBody,searchNames))).Where(x=>x.Result!=Validation.Ignore).ToList();
         if(candidates.Count==0) return false;
         var allCandidates=candidates;
         if(dueRules!=null)
