@@ -37,7 +37,7 @@ internal class EditorForm : Form
     protected AntdUI.Input TextField(string title,string value,bool secret=false,int lines=1) => Field(title,new AntdUI.Input{Text=value,UseSystemPasswordChar=secret,Multiline=lines>1,Height=lines>1?lines*26+12:40,AutoScroll=true});
     protected ComboBox Choice(string title,string value,params string[] choices)
     { var box=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList};box.Items.AddRange(choices);box.SelectedItem=value;return Field(title,box); }
-    protected NumericUpDown Number(string title,int value,int min,int max) => Field(title,new NumericUpDown{Minimum=min,Maximum=max,Value=Math.Clamp(value,min,max)});
+    protected NumericUpDown Number(string title,int value,int min,int max) => Field(title,new ScrollSafeNumber{Minimum=min,Maximum=max,Value=Math.Clamp(value,min,max)});
     protected void SaveButton(Action action)
     {
         var save=new ActionButton{Type=AntdUI.TTypeMini.Primary,Text="保存",Width=110,Height=38};save.Click+=(_,_)=>{try{action();DialogResult=DialogResult.OK;Close();}catch(Exception e){MessageBox.Show(this,e.Message,"无法保存");}};Footer.Controls.Add(save);AcceptButton=save;

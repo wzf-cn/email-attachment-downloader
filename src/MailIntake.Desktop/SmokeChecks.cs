@@ -10,6 +10,19 @@ internal static class SmokeChecks
     public static void Run()
     {
         if(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAILINTAKE_TEST_HOME")))throw new InvalidOperationException("Smoke tests require an isolated data directory.");
+        using(var window=new Form())
+        using(var panel=new Panel{Dock=DockStyle.Fill,AutoScroll=true,AutoScrollMinSize=new Size(0,2000)})
+        using(var number=new ScrollSafeNumber{Minimum=1,Maximum=500,Value=20})
+        {
+            window.Controls.Add(panel);panel.Controls.Add(number);window.Show();number.Focus();Application.DoEvents();
+            var wheel=typeof(ScrollSafeNumber).GetMethod("OnMouseWheel",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance)!;
+            wheel.Invoke(number,[new HandledMouseEventArgs(MouseButtons.None,0,1,1,-120)]);
+            if(number.Value!=20||panel.AutoScrollPosition.Y>=0)throw new Exception("Wheel changed a number or failed to scroll its page");
+            wheel.Invoke(number,[new HandledMouseEventArgs(MouseButtons.None,0,1,1,120)]);
+            if(number.Value!=20||panel.AutoScrollPosition.Y!=0)throw new Exception("Wheel upward scroll failed");
+            number.UpButton();if(number.Value!=21)throw new Exception("Number arrow editing failed");
+            window.Close();
+        }
         var stable=ReleaseUpdates.Parse("{\"tag_name\":\"v1.10.0\",\"html_url\":\"https://untrusted.example\"}",true);
         if(stable?.Version<=new Version(1,9,0,0)||stable?.Page!="https://github.com/wzf-cn/email-attachment-downloader/releases/tag/v1.10.0")throw new Exception("Update version ordering or trusted URL failed");
         foreach(var json in new[]{"{\"tag_name\":\"v9.0.0-beta\"}","{\"tag_name\":\"v9.0.0\",\"draft\":true}","{\"tag_name\":\"v9.0.0\",\"prerelease\":true}","{\"tag_name\":\"../../malicious\"}"})
