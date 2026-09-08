@@ -133,7 +133,7 @@ internal sealed class RuleEditor : EditorForm
         Field("",new Label{AutoSize=true,Text="包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。"});
 
         InlineHeading("下载与存放");
-        var output=TextField("本组下载目录（必填）",source.Output);
+        var output=TextField("本组下载目录（必填）",source.Output);output.AutoScroll=false;
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
         var downloadBody=Field("下载内容",new CheckBox{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
         var downloadAttachments=Field("",new CheckBox{Text="下载附件（含云附件链接说明）",Checked=source.DownloadAttachments});
