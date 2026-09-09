@@ -1,5 +1,8 @@
 name: Mirror release to Gitee
 on:
+  push:
+    branches: [main]
+    paths: ['.github/gitee-sync-request.txt']
   workflow_run:
     workflows: ['Publish Windows release']
     types: [completed]
@@ -16,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   mirror:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,6 +50,7 @@ jobs:
           RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           tag="${INPUT_TAG:-$RUN_TAG}"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then tag="$(head -n 1 .github/gitee-sync-request.txt | tr -d '\r')"; fi
           if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo 'Invalid release tag'; exit 1; fi
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
           gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > release.json
