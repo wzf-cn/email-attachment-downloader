@@ -1,2 +1,2 @@
 v1.7.0
-request: 2026-09-09-first-authorized-sync
+request: 2026-09-09-upload-diagnostics

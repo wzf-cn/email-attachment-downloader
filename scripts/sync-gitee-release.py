@@ -48,7 +48,12 @@ def mirror(tag, root, release):
     session.headers['Authorization'] = 'Bearer ' + token
 
     def api(method, path, **kwargs):
-        response = session.request(method, API + path, timeout=(20, 300), **kwargs)
+        print(f'Gitee {method} {path}', flush=True)
+        try:
+            response = session.request(method, API + path, timeout=(30, 300), **kwargs)
+        except requests.RequestException as error:
+            detail = str(error).replace(token, '[redacted]')
+            raise RuntimeError(f'Gitee {method} {path}: {detail}') from None
         if response.status_code == 404 and method == 'GET':
             return None
         if not response.ok:
@@ -66,7 +71,7 @@ def mirror(tag, root, release):
     attachments = api('GET', path)
     if not isinstance(attachments, list):
         raise ValueError('Unexpected Gitee attachment response')
-    for name in names:
+    for name in [names[2], *names[:2]]:
         # Gitee normally uses name; older responses may use filename.
         matches = [a for a in attachments if (a.get('name') or a.get('filename')) == name]
         if len(matches) > 1:

@@ -59,3 +59,5 @@ Windows 桌面软件：按主题、正文或附件名中的关键词自动保存
 GitHub 自动编译并发布安装包；已加入 Gitee 同文件镜像流程，首次需配置 GITEE_TOKEN 后启用。详见[自动发布设置](docs/AUTOMATED_RELEASES.md)。
 
 Gitee 补同步也可通过提交 `.github/gitee-sync-request.txt` 发起，第一行写版本标签；正常发布仍自动同步。
+
+Gitee 授权及源码同步已验证；附件首次同步正在核验，失败步骤会记录具体接口和连接原因。
