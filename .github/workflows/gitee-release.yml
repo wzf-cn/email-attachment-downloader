@@ -1,0 +1,72 @@
+name: Mirror release to Gitee
+on:
+  workflow_run:
+    workflows: ['Publish Windows release']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing GitHub stable release tag, e.g. v1.7.0'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: gitee-release-mirror
+  cancel-in-progress: false
+jobs:
+  mirror:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require Gitee authorization
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          if [ -z "$GITEE_TOKEN" ]; then
+            echo '::error::Add repository Actions secret GITEE_TOKEN with Gitee projects scope, then rerun this workflow.'
+            exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test sync validation
+        run: |
+          python -m pip install requests==2.32.5
+          python scripts/test-release-sync.py
+      - name: Resolve published release and download original files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          tag="${INPUT_TAG:-$RUN_TAG}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo 'Invalid release tag'; exit 1; fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > release.json
+          mkdir release-assets
+          gh release download "$tag" --dir release-assets --pattern "MailIntake-Setup-${tag#v}.exe" --pattern 'MailIntake-win-x64.zip' --pattern 'SHA256SUMS.txt'
+      - name: Synchronize source and version tag without force
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          askpass="$RUNNER_TEMP/gitee-askpass"
+          cat > "$askpass" <<'ASKPASS'
+          #!/usr/bin/env python3
+          import os, sys
+          print('wzFeel' if 'Username' in sys.argv[1] else os.environ['GITEE_TOKEN'])
+          ASKPASS
+          chmod 700 "$askpass"
+          export GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0
+          trap 'rm -f "$askpass"' EXIT
+          git -c credential.helper= push https://gitee.com/wzFeel/email-attachment-downloader.git refs/remotes/origin/main:refs/heads/main "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+      - name: Publish and verify identical Gitee attachments
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: python scripts/sync-gitee-release.py "$RELEASE_TAG" release-assets release.json
