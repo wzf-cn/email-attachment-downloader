@@ -50,7 +50,7 @@ def mirror(tag, root, release):
     def api(method, path, **kwargs):
         print(f'Gitee {method} {path}', flush=True)
         try:
-            response = session.request(method, API + path, timeout=(30, 300), **kwargs)
+            response = session.request(method, API + path, timeout=(300 if kwargs.get('files') else 30, 300), **kwargs)
         except requests.RequestException as error:
             detail = str(error).replace(token, '[redacted]')
             raise RuntimeError(f'Gitee {method} {path}: {detail}') from None
