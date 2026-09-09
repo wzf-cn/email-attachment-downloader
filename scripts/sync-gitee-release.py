@@ -50,7 +50,7 @@ def mirror(tag, root, release):
     def api(method, path, **kwargs):
         print(f'Gitee {method} {path}', flush=True)
         try:
-            response = session.request(method, API + path, timeout=(300 if kwargs.get('files') else 30, 300), **kwargs)
+            response = session.request(method, API + path, timeout=(60 if method == 'POST' else 30, 300), **kwargs)
         except requests.RequestException as error:
             detail = str(error).replace(token, '[redacted]')
             raise RuntimeError(f'Gitee {method} {path}: {detail}') from None
@@ -78,7 +78,16 @@ def mirror(tag, root, release):
             raise ValueError('Duplicate remote filename: ' + name)
         if not matches:
             with open(root / name, 'rb') as f:
-                uploaded = api('POST', path, files={'file': (name, f, 'application/octet-stream')})
+                from requests_toolbelt.multipart.encoder import MultipartEncoder, MultipartEncoderMonitor
+                encoder = MultipartEncoder(fields={'file': (name, f, 'application/octet-stream')})
+                progress = [0]
+                def report(monitor):
+                    step = monitor.bytes_read // (10 * 1024 * 1024)
+                    if step > progress[0]:
+                        progress[0] = step
+                        print(f'Uploading {name}: {monitor.bytes_read // (1024 * 1024)} MiB sent', flush=True)
+                monitor = MultipartEncoderMonitor(encoder, report)
+                uploaded = api('POST', path, data=monitor, headers={'Content-Type': monitor.content_type})
             matches = [uploaded]
         asset_id = int(matches[0]['id'])
         # Requests strips Authorization on redirects to a different host.
