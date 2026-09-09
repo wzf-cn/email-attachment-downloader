@@ -34,7 +34,7 @@ sealed class Fixture
     public string Root=Path.Combine(Path.GetTempPath(),"MailIntakeTests-"+Guid.NewGuid().ToString("N"));
     public StateStore Store;
     public FakeSender Sender=new();
-    public Settings Settings=new();
+    public Settings Settings=new(){MaxMessageMb=30};
     public MailAccount Account;
     public MailRule Rule;
     public IntakeEngine Engine;
@@ -42,7 +42,7 @@ sealed class Fixture
     public Fixture()
     {
         Directory.CreateDirectory(Root);Store=new(Path.Combine(Root,"test.sqlite3"));
-        Rule=new(){Name="工程实践",Prefix="工程实践",Fields=["姓名"],Keywords=["工程实践","实践提交"],KeyMode="名单",Roster=new(){{"00123","张三"}},Output=Path.Combine(Root,"downloads")};
+        Rule=new(){NaturalLayout=false,Name="工程实践",Prefix="工程实践",Fields=["姓名"],Keywords=["工程实践","实践提交"],KeyMode="名单",Roster=new(){{"00123","张三"}},Output=Path.Combine(Root,"downloads")};
         Account=new(){Address="receiver@example.test",Rules=[Rule]};Settings.Accounts.Add(Account);Engine=new(Store,Sender);
     }
     public Incoming Mail(string id,string subject="工程实践-张三-00123",string from="student@example.test",string text="这是工程实践提交。",bool attach=false)
@@ -62,6 +62,36 @@ sealed class Suite
     {try{await body();passed++;Console.WriteLine("PASS "+name);}catch(Exception e){failed++;Console.WriteLine("FAIL "+name+": "+e);}}
     public async Task Run()
     {
+        await Test("natural export keeps names deduplicates and groups documents",async()=>
+        {
+            var f=new Fixture();f.Rule.NaturalLayout=true;
+            var mail=f.Mail("natural",attach:true);await f.Process(mail);
+            var first=f.Store.Archives().Single();Eq(true,first.Attachments.Single().EndsWith("_附件.txt"));
+            await f.Engine.ProcessAsync(f.Account,mail,f.Settings,_=>{},CancellationToken.None,true);
+            Eq(first.Attachments.Single(),f.Store.Archives().Single().Attachments.Single());
+            File.Delete(first.Attachments.Single());await f.Process(mail);Eq(true,File.Exists(first.Attachments.Single()));
+        });
+        await Test("natural ZIP export preserves GBK name and same-name different content",async()=>
+        {
+            var f=new Fixture();f.Rule.NaturalLayout=true;
+            var mail=f.Mail("zip-1");
+            var builder=new BodyBuilder{TextBody="report"};builder.Attachments.Add("¡¾Êµ¼ù±¨¸æ¡¿-ÁõË¶-2026-105.zip",new byte[]{1,2,3});mail.Header.Body=builder.ToMessageBody();
+            await f.Process(mail);var first=f.Store.Archives().Single().Attachments.Single();
+            Eq(Path.Combine(f.Rule.Output,"【实践报告】-刘硕-2026-105.zip"),first);
+            var second=f.Mail("zip-2");builder=new BodyBuilder();builder.Attachments.Add("¡¾Êµ¼ù±¨¸æ¡¿-ÁõË¶-2026-105.zip",new byte[]{4,5,6});second.Header.Body=builder.ToMessageBody();
+            await f.Process(second);Eq(2,Directory.GetFiles(f.Rule.Output,"*.zip").Length);Eq((byte)1,File.ReadAllBytes(first)[0]);
+            await f.Engine.ProcessAsync(f.Account,second,f.Settings,_=>{},CancellationToken.None,true);Eq(2,Directory.GetFiles(f.Rule.Output,"*.zip").Length);
+        });
+        await Test("end time stops reception at the selected second",()=>
+        {
+            var account=new MailAccount{Since=new DateTime(2026,9,1)};
+            var rule=new MailRule{EndAt=new DateTime(2026,9,9,15,30,20)};
+            var boundary=new DateTimeOffset(DateTime.SpecifyKind(rule.EndAt.Value,DateTimeKind.Local));
+            Eq(true,RuleTimeRange.Contains(rule,account,boundary));
+            Eq(false,RuleTimeRange.Contains(rule,account,boundary.AddSeconds(1)));
+            rule.EndAt=null;Eq(true,RuleTimeRange.Contains(rule,account,boundary.AddDays(1)));
+            return Task.CompletedTask;
+        });
         await Test("repair GB encoded bracketed subject without changing foreign text",()=>
         {
             Eq("【实践报告】-刘硕-2026-105",SubjectEncoding.Repair("¡¾Êµ¼ù±¨¸æ¡¿-ÁõË¶-2026-105"));

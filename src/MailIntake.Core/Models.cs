@@ -12,7 +12,7 @@ public sealed class Settings
     public int IntervalMinutes { get; set; } = 5;
     public bool AutoStart { get; set; } = true;
     public bool RunOnLaunch { get; set; }
-    public int MaxMessageMb { get; set; } = 30;
+    public int MaxMessageMb { get; set; } = 150;
     public int MaxPerCycle { get; set; } = 200;
     public int ErrorThreshold { get; set; } = 3;
     public int MaxRepliesPerHour { get; set; } = 100;
@@ -44,6 +44,7 @@ public sealed class MailRule
     public string Name { get; set; } = "";
     public string Mode { get; set; } = "结构校验";
     public DateTime? StartDate { get; set; }
+    public DateTime? EndAt { get; set; }
     public DateTime? EndDate { get; set; }
     public string InstructionTopic { get; set; } = "";
     public string Prefix { get; set; } = ""; // Legacy import only.
@@ -63,6 +64,7 @@ public sealed class MailRule
     public bool DownloadAttachments { get; set; } = true;
     public bool SaveOriginal { get; set; } = true;
     public int MaxAttachmentMb { get; set; } = 20;
+    public bool NaturalLayout { get; set; } = true;
     public bool FlatAttachments { get; set; }
     public bool ReplyEnabled { get; set; } = true;
     public string SuccessReply { get; set; } = "已收到，正文及附件已保存。";

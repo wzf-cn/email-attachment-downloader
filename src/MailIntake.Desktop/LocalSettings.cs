@@ -26,6 +26,7 @@ internal static class LocalSettings
                         if(!rules[r].TryGetProperty("IntervalMinutes",out _))settings.Accounts[a].Rules[r].IntervalMinutes=Math.Clamp(settings.IntervalMinutes,1,1440);
         foreach(var account in settings.Accounts)
             foreach(var rule in account.Rules)UseKeywords(rule);
+        if(settings.Version<2){if(settings.MaxMessageMb==30)settings.MaxMessageMb=150;settings.Version=2;}
         return settings;
     }
     private static void UseKeywords(MailRule rule)

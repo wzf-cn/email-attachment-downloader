@@ -52,7 +52,7 @@ internal static class UiLanguage
         }
         if(root is DataGridView grid)
         {
-            void Headers(){foreach(DataGridViewColumn col in grid.Columns)col.HeaderText=T(col.DataPropertyName);}
+            void Headers(){foreach(DataGridViewColumn col in grid.Columns)col.HeaderText=T(string.IsNullOrEmpty(col.DataPropertyName)?col.Name:col.DataPropertyName);}
             if(!Equals(grid.Tag,"localized-grid")){grid.Tag="localized-grid";grid.DataBindingComplete+=(_,_)=>Headers();grid.CellFormatting+=(_,e)=>{if(e.ColumnIndex>=0&&(grid.Columns[e.ColumnIndex].DataPropertyName is "状态" or "模式" or "接收状态" or "自动回复")&&e.Value is string value)e.Value=T(value);};}
             Headers();
         }
@@ -93,6 +93,13 @@ internal static class UiLanguage
 包含开始和结束当天；不勾选结束日期表示持续接收。IMAP 按收件日期，POP3 按发送日期。|Both dates are inclusive. Uncheck the end date to keep receiving. IMAP uses received dates; POP3 uses sent dates.
 设置结束日期|Set end date
 包含开始和结束当天；关闭结束日期开关表示持续接收。IMAP 按收件日期，POP3 按发送日期。|Both dates are inclusive. Turn off the end-date switch to keep receiving. IMAP uses received dates; POP3 uses sent dates.
+持续接收|Keep receiving
+定时结束|End at
+结束时间|End time
+结束时间不能早于开始日期。|End time cannot precede the start date.
+结束时间使用电脑本地时间，精确到秒。IMAP 按收件时间，POP3 按邮件发送时间筛选。|End time uses local computer time, including seconds. IMAP uses received time; POP3 uses sent time.
+附件整理|Attachment layout
+按原名整理：压缩包直接存放，普通文档按主题归组|Keep original names: archives in the root, documents grouped by subject
 发给提交者|For senders
 一键生成主题说明|Generate subject instructions
 主题填写说明|Subject instructions
@@ -118,7 +125,8 @@ internal static class UiLanguage
 检查频率（分钟）|Check interval (minutes)
 检查频率必须为 1 到 1440 分钟。|Check interval must be between 1 and 1440 minutes.
 分隔符和主题项目不能为空。|Separator and subject fields are required.
-启动时检查软件更新|Check for software updates at startup
+启动时检查更新|Check updates
+检查软件更新|Check for software updates at startup
 软件更新|Software updates
 检查软件更新|Check for updates
 无法保存更新设置。|Could not save update preferences.

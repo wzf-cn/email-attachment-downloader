@@ -35,6 +35,11 @@ internal static class Program
                 using var sponsor=new SupportForm(true);sponsor.Show(form);Capture(sponsor,"sponsor");sponsor.Close();
                 using var instructions=new SubjectInstructionsForm(new MailIntake.Core.MailRule{Mode="关键词",Keywords=["工程实践","报告"]});instructions.Show(form);Capture(instructions,"instructions");instructions.Close();
                 using var rule=new RuleEditor(LocalSettings.Load().Accounts[0].Rules[0]);rule.Show(form);
+                var continuous=(ToggleOption)rule.Controls.Find("continuousReceive",true).Single();
+                var endPicker=(DateTimePicker)rule.Controls.Find("结束日期",true).Single();
+                continuous.Checked=true;if(endPicker.Visible)throw new Exception("End picker must be hidden for continuous reception");
+                continuous.Checked=false;if(!endPicker.Visible||!endPicker.CustomFormat.Contains("ss"))throw new Exception("Second-precision end picker missing");
+                Capture(rule,"end-time");continuous.Checked=true;
                 Capture(rule,"rule0");rule.ScrollToEnd();Capture(rule,"rule-bottom");
                 rule.Size=rule.MinimumSize;rule.ScrollToEnd();Capture(rule,"rule-small");rule.Close();
                 for(int i=0;i<form.Navigation.PageCount;i++){form.Navigation.SelectPage(i);Capture(form,"page"+i);}

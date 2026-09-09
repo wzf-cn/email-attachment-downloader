@@ -129,17 +129,21 @@ internal sealed class RuleEditor : EditorForm
         var matchAll=Field("关键词模式",new ToggleOption{Text="要求全部关键词匹配",Checked=source.MatchAll});
         var frequency=Number("检查频率（分钟）",source.IntervalMinutes,1,1440);
         var start=Field("开始日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.StartDate??accountSince??DateTime.Today.AddDays(-30)});
-        var end=Field("结束日期",new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd",Value=source.EndDate??DateTime.Today});
-        var limitEnd=Field("",new ToggleOption{Text="设置结束日期",Checked=source.EndDate.HasValue});
-        end.Enabled=limitEnd.Checked;limitEnd.CheckedChanged+=(_,_)=>end.Enabled=limitEnd.Checked;
-        Field("",new Label{AutoSize=true,Text="包含开始和结束当天；关闭结束日期开关表示持续接收。IMAP 按收件日期，POP3 按发送日期。"});
+        var continuous=new ToggleOption{Text="持续接收",Checked=!source.EndAt.HasValue&&!source.EndDate.HasValue,Name="continuousReceive"};
+        var end=new DateTimePicker{Format=DateTimePickerFormat.Custom,CustomFormat="yyyy-MM-dd HH:mm:ss",Width=260,Name="结束日期",Value=source.EndAt??source.EndDate?.Date.AddHours(23).AddMinutes(59).AddSeconds(59)??DateTime.Now};
+        var endRow=new FlowLayoutPanel{AutoSize=true};endRow.Controls.Add(continuous);endRow.Controls.Add(end);Field("结束时间",endRow);
+        void UpdateEnd(){end.Visible=!continuous.Checked;continuous.Text=continuous.Checked?"持续接收":"定时结束";}
+        continuous.CheckedChanged+=(_,_)=>UpdateEnd();UpdateEnd();
+        Field("",new Label{AutoSize=true,Text="结束时间使用电脑本地时间，精确到秒。IMAP 按收件时间，POP3 按邮件发送时间筛选。"});
 
         InlineHeading("下载与存放");
         var output=TextField("本组下载目录（必填）",source.Output);output.AutoScroll=false;
         var browse=Field("",new ActionButton{Text="选择该组下载目录…",Height=32});browse.Click+=(_,_)=>{using var picker=new FolderBrowserDialog();if(picker.ShowDialog(this)==DialogResult.OK)output.Text=picker.SelectedPath;};
         var downloadBody=Field("下载内容",new ToggleOption{Text="下载正文（文本及 HTML）",Checked=source.DownloadBody});
         var downloadAttachments=Field("",new ToggleOption{Text="下载附件（含云附件链接说明）",Checked=source.DownloadAttachments});
+        var natural=Field("附件整理",new ToggleOption{Text="按原名整理：压缩包直接存放，普通文档按主题归组",Checked=source.NaturalLayout});
         var flatAttachments=Field("附件存放方式",new ToggleOption{Text="所有附件集中到本组目录的“全部附件”文件夹",Checked=source.FlatAttachments});
+        flatAttachments.Enabled=!natural.Checked;natural.CheckedChanged+=(_,_)=>flatAttachments.Enabled=!natural.Checked;
         Field("",new Label{AutoSize=true,Text="不勾选：按邮件分别存放。勾选：附件集中存放，正文及记录仍按邮件分开；文件名带主题和唯一编号，避免同名覆盖。"});
         var attachmentLimit=Number("单个附件上限（MB）",source.MaxAttachmentMb,1,500);
         Field("超限处理",new Label{AutoSize=true,Text="默认 20 MB；超过时仅记录文件名、大小和原因，不导出该文件，也不保存包含它的完整 EML。其他附件照常导出。当前需接收邮件后判断附件大小；若要避免接收整封大邮件，请同时设置主界面的邮件上限。"});
@@ -155,7 +159,7 @@ internal sealed class RuleEditor : EditorForm
         var sampleNames=TextField("测试附件名（逗号分隔）","");
         var test=Field("",new ActionButton{Text="测试识别",Height=32});
         static List<string> Split(string s)=>s.Replace('，',',').Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries).Distinct().ToList();
-        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),StartDate=start.Value.Date,EndDate=limitEnd.Checked?end.Value.Date:null,Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
+        MailRule Read()=>new(){Id=source.Id,Name=name.Text.Trim(),StartDate=start.Value.Date,EndAt=continuous.Checked?null:new DateTime(end.Value.Year,end.Value.Month,end.Value.Day,end.Value.Hour,end.Value.Minute,end.Value.Second),Mode="关键词",Keywords=Split(keywords.Text),MatchAll=matchAll.Checked,SearchSubject=searchSubject.Checked,SearchBody=searchBody.Checked,SearchAttachmentNames=searchAttachments.Checked,Prefix="",IntervalMinutes=(int)frequency.Value,Output=output.Text.Trim(),DownloadBody=downloadBody.Checked,DownloadAttachments=downloadAttachments.Checked,NaturalLayout=natural.Checked,FlatAttachments=flatAttachments.Checked,SaveOriginal=saveOriginal.Checked,MaxAttachmentMb=(int)attachmentLimit.Value,ReplyEnabled=replies.Checked,SuccessReply=success.Text,DetectAnomaly=detect.Checked};
         name.Name="名称";keywords.Name="关键词";scopes.Name="检索范围";frequency.Name="检查频率";start.Name="开始日期";end.Name="结束日期";output.Name="下载目录";replies.Name="自动回复";
         makeInstructions.Click+=(_,_)=>
         {

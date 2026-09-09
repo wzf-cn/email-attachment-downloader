@@ -25,7 +25,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         token.ThrowIfCancellationRequested();
         incoming=incoming with {Subject=SubjectEncoding.Repair(incoming.Subject)};
         var eligible=account.Rules.Where(r=>RuleTimeRange.Contains(r,account,incoming.ReceivedAt??incoming.Header.Date)).ToList();
-        if(eligible.Count==0)return false;
+        if(eligible.Count==0){log("跳过（不在规则时间范围）："+incoming.Subject);return false;}
         string from=incoming.Sender.ToLowerInvariant();
         bool handled=store.IsHandled(incoming.Id);
         if(store.IsBlocked(from)) { if(handled&&!reexport)return false; if(!reexport)store.Mark(incoming.Id,"Blocked",from,account.Address); return !reexport; }
@@ -57,7 +57,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
             searchNames=AttachmentExport.Parts(loaded).Select(p=>p.ContentDisposition?.FileName??p.ContentType.Name??"").Where(n=>n.Length>0).ToArray();
         }
         var candidates=eligible.Select(r=>(Rule:r,Result:RuleValidator.Match(incoming.Subject,r,searchBody,searchNames))).Where(x=>x.Result!=Validation.Ignore).ToList();
-        if(candidates.Count==0) return false;
+        if(candidates.Count==0){log("跳过（未满足关键词或检索范围）："+incoming.Subject);return false;}
         var allCandidates=candidates;
         if(dueRules!=null)
         {
@@ -171,6 +171,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
             if(record.SkippedAttachments.Any(s=>s.Name==original))continue;
             string name=$"attachment_{++index:000}_"+SafeName(attachment.ContentDisposition?.FileName??attachment.ContentType.Name??"attachment.bin");
             var target=record.Attachments.FirstOrDefault(f=>Path.GetFileName(f)==name||Path.GetFileName(f).EndsWith("_"+name,StringComparison.Ordinal));
+            if(target is null&&rule.NaturalLayout&&index<=record.Attachments.Count)target=record.Attachments[index-1];
             if(target is null||File.Exists(target))continue;
             target=Path.GetFullPath(target);
             if(!target.StartsWith(root,StringComparison.OrdinalIgnoreCase))continue;
@@ -193,6 +194,7 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
     public static async Task<ArchiveRecord> ArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string recordId,CancellationToken token)
     {
         incoming=incoming with {Subject=SubjectEncoding.Repair(incoming.Subject)};
+        if(rule.NaturalLayout)return await NaturalArchiveAsync(account,incoming,message,rule,recordId,token);
         string parent=Path.GetFullPath(rule.Output); Directory.CreateDirectory(parent);
         string final=Path.Combine(parent,SafeName(incoming.Subject)+"_"+(incoming.ReceivedAt??message.Date).ToLocalTime().ToString("yyyyMMdd-HHmmss")+"_"+incoming.Id[..8]);
         string staging=Path.Combine(parent,"."+incoming.Id[..24]+"-"+Guid.NewGuid().ToString("N")+".partial");
@@ -246,6 +248,43 @@ public sealed class IntakeEngine(StateStore store,IReplySender sender)
         var record=new ArchiveRecord(recordId,account.Address,incoming.Sender,incoming.Subject,rule.Name,final,incoming.ReceivedAt,message.Date,DateTimeOffset.UtcNow,message.MessageId??"",files){SkippedAttachments=skipped};
         await File.WriteAllTextAsync(Path.Combine(staging,"metadata.json"),JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true}),token);
         Directory.Move(staging,final); return record;
+    }
+    private static async Task<ArchiveRecord> NaturalArchiveAsync(MailAccount account,Incoming incoming,MimeMessage message,MailRule rule,string id,CancellationToken token)
+    {
+        string root=Path.GetFullPath(rule.Output);
+        var internalRule=JsonSerializer.Deserialize<MailRule>(JsonSerializer.Serialize(rule))!;
+        internalRule.NaturalLayout=false;internalRule.FlatAttachments=false;internalRule.Output=Path.Combine(root,"收件记录");
+        var record=await ArchiveAsync(account,incoming,message,internalRule,id,token);
+        var files=new List<string>();
+        foreach(var source in record.Attachments)
+        {
+            string name=Regex.Replace(Path.GetFileName(source),@"^attachment_\d+_","");
+            name=SafeName(SubjectEncoding.Repair(name));
+            string extension=Path.GetExtension(name).ToLowerInvariant();
+            string folder=new[]{".zip",".7z",".rar"}.Contains(extension)?root:Path.Combine(root,SafeName(incoming.Subject));
+            Directory.CreateDirectory(folder);
+            byte[] hash;using(var stream=File.OpenRead(source))hash=SHA256.HashData(stream);
+            string? destination=null;
+            foreach(string existing in Directory.EnumerateFiles(folder,"*",SearchOption.TopDirectoryOnly))
+            {
+                if(new FileInfo(existing).Length!=new FileInfo(source).Length)continue;
+                using var stream=File.OpenRead(existing);
+                if(SHA256.HashData(stream).SequenceEqual(hash)){destination=existing;break;}
+            }
+            if(destination is null)
+            {
+                destination=Path.Combine(folder,name);
+                if(File.Exists(destination))destination=Path.Combine(folder,Path.GetFileNameWithoutExtension(name)+"_"+Convert.ToHexStringLower(hash)[..12]+extension);
+                int suffix=1;string basis=destination;while(File.Exists(destination))destination=Path.Combine(folder,Path.GetFileNameWithoutExtension(basis)+"_"+(suffix++)+extension);
+                File.Move(source,destination);
+            }
+            else File.Delete(source);
+            files.Add(destination);
+        }
+        record=record with {Attachments=files};
+        await File.WriteAllTextAsync(Path.Combine(record.Directory,"metadata.json"),JsonSerializer.Serialize(record,new JsonSerializerOptions{WriteIndented=true}),token);
+        await File.WriteAllLinesAsync(Path.Combine(record.Directory,"附件位置.txt"),files,token);
+        return record;
     }
     private void CheckAnomaly(Incoming incoming,MimeMessage message,string directory,string account,Action<string> log)
     {
